@@ -23,8 +23,11 @@ dev = [
     "httpx>=0.28",
     "mypy>=1.13",
     "pre-commit>=4.0",
+    "pydantic>=2.10",
+    "pymupdf>=1.24",
     "pytest>=8.3",
     "pytest-asyncio>=0.25",
+    "pyyaml>=6",
     "ruff>=0.8",
 ]
 
@@ -70,6 +73,10 @@ files = [
     "packages/ingestion/src",
     "scripts/staging_lib.py",
     "scripts/stage_manual_pdf.py",
+    "scripts/metadata_models.py",
+    "scripts/rule_extraction.py",
+    "scripts/inbox_staging.py",
+    "scripts/stage_manual_inbox.py",
 ]
 mypy_path = [
     "apps/api/src",
@@ -84,4 +91,12 @@ explicit_package_bases = true
 
 [[tool.mypy.overrides]]
 module = ["opentelemetry.*", "opentelemetry_exporter.*", "opentelemetry_instrumentation.*"]
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+module = ["fitz"]
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+module = ["yaml"]
 ignore_missing_imports = true

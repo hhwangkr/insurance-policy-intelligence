@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import hashlib
 import re
+import shutil
 from pathlib import Path
 
 _SHA256_HEX_LEN = 64
@@ -89,6 +90,18 @@ def resolve_manual_source_pdf(*, repo_root: Path, source: Path) -> Path:
     if expanded.is_absolute():
         return expanded.resolve()
     return (repo_root / expanded).resolve()
+
+
+def copy_staged_pdf(*, source: Path, destination: Path, content_hash: str) -> None:
+    """Copy a PDF into raw/manual, skipping if an identical file already exists."""
+    if destination.exists():
+        existing_hash = sha256_hex_file(destination)
+        if existing_hash == content_hash:
+            return
+        msg = f"destination exists with different content: {destination}"
+        raise FileExistsError(msg)
+    destination.parent.mkdir(parents=True, exist_ok=True)
+    shutil.copy2(source, destination)
 
 
 def yaml_double_quoted_scalar(value: str) -> str:

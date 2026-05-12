@@ -1,13 +1,13 @@
 from __future__ import annotations
 
 import argparse
-import shutil
 from datetime import UTC, datetime
 from pathlib import Path
 
 from staging_lib import (
     build_document_id,
     build_storage_basename,
+    copy_staged_pdf,
     format_manifest_entry_yaml,
     manual_pdf_relative_path,
     resolve_manual_source_pdf,
@@ -24,17 +24,6 @@ def _parse_tags(raw: str) -> list[str]:
     if not raw.strip():
         return []
     return [part.strip() for part in raw.split(",") if part.strip()]
-
-
-def _stage_copy(*, source: Path, destination: Path, content_hash: str) -> None:
-    if destination.exists():
-        existing_hash = sha256_hex_file(destination)
-        if existing_hash == content_hash:
-            return
-        msg = f"destination exists with different content: {destination}"
-        raise FileExistsError(msg)
-    destination.parent.mkdir(parents=True, exist_ok=True)
-    shutil.copy2(source, destination)
 
 
 def main() -> int:
@@ -114,7 +103,7 @@ def main() -> int:
     tags = _parse_tags(args.tags)
 
     if not args.dry_run:
-        _stage_copy(source=source, destination=destination, content_hash=content_hash)
+        copy_staged_pdf(source=source, destination=destination, content_hash=content_hash)
 
     manifest_yaml = format_manifest_entry_yaml(
         document_id=document_id,

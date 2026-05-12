@@ -74,6 +74,8 @@ data/
   manifests/      # YAML manifest drafts
 
 scripts/          # operational helpers (see docs/data-staging.md)
+                  #   stage_manual_pdf.py   — single-file manual staging (explicit CLI)
+                  #   stage_manual_inbox.py — rule-based inbox batch + manual.yaml
 
 docs/
   data-staging.md   # Manual PDF staging and manifest conventions
