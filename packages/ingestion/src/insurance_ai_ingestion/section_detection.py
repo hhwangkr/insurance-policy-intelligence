@@ -83,6 +83,55 @@ def _collapse_ws(s: str) -> str:
     return re.sub(r"\s+", "", s)
 
 
+def _first_line_at_offset(full_text: str, offset: int) -> str:
+    if offset < 0 or offset >= len(full_text):
+        return ""
+    line_end = full_text.find("\n", offset)
+    if line_end == -1:
+        return full_text[offset:]
+    return full_text[offset:line_end]
+
+
+def _article_heading_line_looks_like_toc_outline_row(full_text: str, offset: int) -> bool:
+    """Dense TOC rows: dot leaders or same-line page refs (still pass the toc_like tail gate)."""
+    head = _first_line_at_offset(full_text, offset).strip()
+    if not re.match(r"^\s*제\s*\d+\s*조", head):
+        return False
+    if len(head) > 140:
+        return False
+    if re.search(r"\.{4,}", head):
+        return True
+    if re.search(r"(?:[\.\．]\s*\d{1,4}|\d{1,4}\s*p)\s*$", head, flags=re.IGNORECASE):
+        return True
+    return False
+
+
+def _part_heading_line_looks_like_toc_outline_row(full_text: str, offset: int) -> bool:
+    head = _first_line_at_offset(full_text, offset).strip()
+    if not re.match(r"^\s*제\s*\d+\s*관", head):
+        return False
+    if len(head) > 140:
+        return False
+    if re.search(r"\.{4,}", head):
+        return True
+    if re.search(r"(?:[\.\．]\s*\d{1,4}|\d{1,4}\s*p)\s*$", head, flags=re.IGNORECASE):
+        return True
+    return False
+
+
+def _appendix_heading_line_looks_like_toc_outline_row(full_text: str, offset: int) -> bool:
+    head = _first_line_at_offset(full_text, offset).strip()
+    if len(head) > 140:
+        return False
+    if not (head.startswith("(") or head.startswith("（") or "별표" in head):
+        return False
+    if re.search(r"\.{4,}", head):
+        return True
+    if re.search(r"(?:[\.\．]\s*\d{1,4}|\d{1,4}\s*p)\s*$", head, flags=re.IGNORECASE):
+        return True
+    return False
+
+
 def _article_suppressed_in_appendix_region(
     candidate: SectionCandidate,
     full_text: str,
@@ -198,6 +247,33 @@ def _appendix_slice_has_substantive_body(full_text: str, start: int, end_exclusi
     if _non_pointer_tail_chars(tail) >= _MIN_APPENDIX_BODY_CHARS:
         return True
     return False
+
+
+def _appendix_substantive_slice_end(
+    *,
+    candidate_index: int,
+    candidates: list[SectionCandidate],
+    full_text: str,
+    total_len: int,
+    by_page: dict[int, PageRegion],
+) -> int:
+    """End offset for appendix-body gate: skip appendix-region article pins dropped later."""
+    j = candidate_index + 1
+    while j < len(candidates):
+        nxt = candidates[j]
+        region = by_page.get(nxt.start_page)
+        following = candidates[j + 1].start_char_offset if j + 1 < len(candidates) else total_len
+        if (
+            region is not None
+            and region.region_type == "appendix"
+            and nxt.section_type == "article"
+        ):
+            sup, _ = _article_suppressed_in_appendix_region(nxt, full_text, following)
+            if sup:
+                j += 1
+                continue
+        break
+    return candidates[j].start_char_offset if j < len(candidates) else total_len
 
 
 def _legal_chunk_has_substantive_law_content(chunk: str) -> bool:
@@ -526,6 +602,13 @@ def assemble_document_sections(
     for i, c in enumerate(sorted_cands):
         region = by_page.get(c.start_page)
         next_start = next_offset_by_index[i]
+        appendix_body_end = _appendix_substantive_slice_end(
+            candidate_index=i,
+            candidates=sorted_cands,
+            full_text=full_text,
+            total_len=total_len,
+            by_page=by_page,
+        )
 
         emit: bool
         trace: list[str]
@@ -541,9 +624,33 @@ def assemble_document_sections(
             emit = False
         else:
             emit, trace = _should_emit_candidate(c, region)
+            if (
+                not emit
+                and region is not None
+                and region.region_type == "toc"
+                and c.section_type in ("part", "article", "appendix")
+            ):
+                looks_toc = False
+                if c.section_type == "article":
+                    looks_toc = _article_heading_line_looks_like_toc_outline_row(
+                        full_text, c.start_char_offset
+                    )
+                elif c.section_type == "part":
+                    looks_toc = _part_heading_line_looks_like_toc_outline_row(
+                        full_text, c.start_char_offset
+                    )
+                else:
+                    looks_toc = _appendix_heading_line_looks_like_toc_outline_row(
+                        full_text, c.start_char_offset
+                    )
+                if not looks_toc:
+                    emit = True
+                    trace = trace + ["filter:toc_region_structural_emit_after_toc_like_gate"]
 
         if emit and c.section_type == "appendix":
-            if not _appendix_slice_has_substantive_body(full_text, c.start_char_offset, next_start):
+            if not _appendix_slice_has_substantive_body(
+                full_text, c.start_char_offset, appendix_body_end
+            ):
                 trace = trace + ["filter:appendix_insufficient_substantive_body"]
                 emit = False
 

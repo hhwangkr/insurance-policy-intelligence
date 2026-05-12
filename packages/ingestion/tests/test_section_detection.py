@@ -3,12 +3,14 @@ from __future__ import annotations
 from datetime import UTC, date, datetime
 
 from insurance_ai_ingestion.section_detection import (
+    assemble_document_sections,
     build_sections_artifact,
     collect_section_candidates,
     detect_sections,
     run_section_detection,
 )
 from insurance_ai_shared.models.document import Document, DocumentMetadata, DocumentPage
+from insurance_ai_shared.models.section import PageRegion
 
 
 def _meta(document_id: str) -> DocumentMetadata:
@@ -666,6 +668,128 @@ def test_appendix_region_suppresses_table_style_article_pins() -> None:
     sections = detect_sections(doc)
     arts = [s for s in sections if s.section_type == "article"]
     assert arts == []
+
+
+def test_toc_region_override_emits_part_and_closes_article() -> None:
+    """Misclassified TOC pages still emit real 관/조 headings when lines are not TOC-row shaped."""
+    doc_id = "doc_toc_override_structure"
+    body = "\n".join(
+        [
+            "제35조 (배당금의지급)",
+            "이 계약은 배당금 규정입니다." * 6,
+            "제7관 분쟁의 조정 등",
+            "제36조 (분쟁의 조정)",
+            "회사는 분쟁 조정 절차를 따릅니다." * 6,
+        ]
+    )
+    pages = [_page(doc_id, 1, body)]
+    doc = Document(
+        document_id=doc_id,
+        metadata=_meta(doc_id),
+        pages=pages,
+        page_count=1,
+        total_char_count=len(body),
+        created_at=datetime.now(UTC),
+    )
+    cands = collect_section_candidates(doc)
+    regions = [
+        PageRegion(
+            document_id=doc_id,
+            page_number=1,
+            region_type="toc",
+            confidence=0.9,
+            evidence=["test:forced_toc"],
+        ),
+    ]
+    sections = assemble_document_sections(document=doc, candidates=cands, page_regions=regions)
+    titles = [s.title for s in sections]
+    assert any("제7관" in t for t in titles)
+    assert any("제36조" in t for t in titles)
+    sec35 = next(s for s in sections if s.section_type == "article" and "제35조" in s.title)
+    assert "제7관" not in sec35.text
+    assert "제36조" not in sec35.text
+
+
+def test_appendix_substantive_gate_skips_suppressed_table_article_pins() -> None:
+    """Appendix body gate ignores appendix-region 조 pins that assembly drops later."""
+    doc_id = "doc_appendix_gate_skip_pins"
+    filler = "적립이율 및 지급 이자에 관한 상세 설명입니다." * 20
+    body = "\n".join(
+        [
+            "( 별표 3 )",
+            "(제7조제2항 관련)",
+            filler,
+            "제22조 (계약의",
+            "소멸) 표기",
+            "( 별표 4 ) 기타",
+            filler,
+        ]
+    )
+    pages = [_page(doc_id, 1, body)]
+    doc = Document(
+        document_id=doc_id,
+        metadata=_meta(doc_id),
+        pages=pages,
+        page_count=1,
+        total_char_count=len(body),
+        created_at=datetime.now(UTC),
+    )
+    cands = collect_section_candidates(doc)
+    regions = [
+        PageRegion(
+            document_id=doc_id,
+            page_number=1,
+            region_type="appendix",
+            confidence=0.9,
+            evidence=["test:forced_appendix"],
+        ),
+    ]
+    sections = assemble_document_sections(document=doc, candidates=cands, page_regions=regions)
+    apx = [s for s in sections if s.section_type == "appendix"]
+    assert len(apx) >= 2
+    apx3 = next(
+        s
+        for s in apx
+        if ("별표 3" in s.title or "별표3" in s.title.replace(" ", "")) and "별표 4" not in s.title
+    )
+    assert "( 별표 4 )" not in apx3.text
+    assert len(apx3.text) > 400
+
+
+def test_same_page_candidates_emitted_in_char_offset_order() -> None:
+    doc_id = "doc_same_page_offsets"
+    body = "\n".join(
+        [
+            "제1조 (목적)",
+            "이 계약은 목적입니다." * 8,
+            "제2조 (정의)",
+            "용어 정의 본문입니다." * 8,
+        ]
+    )
+    pages = [_page(doc_id, 1, body)]
+    doc = Document(
+        document_id=doc_id,
+        metadata=_meta(doc_id),
+        pages=pages,
+        page_count=1,
+        total_char_count=len(body),
+        created_at=datetime.now(UTC),
+    )
+    cands = collect_section_candidates(doc)
+    regions = [
+        PageRegion(
+            document_id=doc_id,
+            page_number=1,
+            region_type="toc",
+            confidence=0.9,
+            evidence=["test:forced_toc"],
+        ),
+    ]
+    sections = assemble_document_sections(document=doc, candidates=cands, page_regions=regions)
+    arts = [s for s in sections if s.section_type == "article"]
+    offs = [s.start_char_offset for s in arts]
+    assert offs == sorted(offs)
+    assert len(arts) == 2
 
 
 def test_build_sections_artifact_preserves_document_created_at() -> None:
