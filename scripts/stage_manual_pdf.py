@@ -10,9 +10,9 @@ from staging_lib import (
     build_storage_basename,
     format_manifest_entry_yaml,
     manual_pdf_relative_path,
+    resolve_manual_source_pdf,
     sha256_hex_file,
     validate_effective_date,
-    yaml_double_quoted_scalar,
 )
 
 
@@ -40,10 +40,19 @@ def _stage_copy(*, source: Path, destination: Path, content_hash: str) -> None:
 def main() -> int:
     parser = argparse.ArgumentParser(
         description=(
-            "Stage a manually downloaded PDF into data/raw/manual/ with a hash-based filename."
+            "Copy a PDF from data/inbox/manual/ (or another path) into data/raw/manual/ "
+            "using a normalized hash-based filename, and print a manifest YAML snippet."
         ),
     )
-    parser.add_argument("--source", required=True, type=Path, help="Path to the downloaded PDF.")
+    parser.add_argument(
+        "--source",
+        required=True,
+        type=Path,
+        help=(
+            "PDF to stage: repo-relative path (preferred), e.g. data/inbox/manual/PolicyBook.pdf, "
+            "or an absolute path."
+        ),
+    )
     parser.add_argument("--insurer", required=True, help="Insurer label (normalized for filename).")
     parser.add_argument(
         "--product-name", required=True, dest="product_name", help="Human-readable product name."
@@ -79,12 +88,13 @@ def main() -> int:
     )
     args = parser.parse_args()
 
-    source = args.source.expanduser().resolve()
+    repo_root = _repo_root()
+    source = resolve_manual_source_pdf(repo_root=repo_root, source=args.source)
     if not source.is_file():
-        print(f"source is not a file: {source}")  # noqa: T201
+        print(f"source is not a file: {source}")
         return 2
     if source.suffix.lower() != ".pdf":
-        print("source file must have a .pdf extension")  # noqa: T201
+        print("source file must have a .pdf extension")
         return 2
 
     content_hash = sha256_hex_file(source)
@@ -98,7 +108,6 @@ def main() -> int:
         content_hash_hex=content_hash,
     )
     document_id = build_document_id(basename)
-    repo_root = _repo_root()
     destination = repo_root / "data" / "raw" / "manual" / basename
     relative_path = manual_pdf_relative_path(basename)
     collected_at = datetime.now(tz=UTC).isoformat()
@@ -129,7 +138,6 @@ def main() -> int:
 
     print("# Manifest entry template (paste under `documents:` in a manifest file)")
     print(manifest_yaml, end="")
-    print(f"# staged_path: {yaml_double_quoted_scalar(destination.resolve().as_posix())}")
     return 0
 
 

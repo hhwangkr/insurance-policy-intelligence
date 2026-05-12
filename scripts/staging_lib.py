@@ -83,6 +83,14 @@ def manual_pdf_relative_path(storage_basename: str) -> str:
     return f"data/raw/manual/{storage_basename}"
 
 
+def resolve_manual_source_pdf(*, repo_root: Path, source: Path) -> Path:
+    """Resolve a PDF path: absolute paths as-is; repo-relative paths against repo_root."""
+    expanded = source.expanduser()
+    if expanded.is_absolute():
+        return expanded.resolve()
+    return (repo_root / expanded).resolve()
+
+
 def yaml_double_quoted_scalar(value: str) -> str:
     """Emit a YAML double-quoted scalar (minimal escaping)."""
     escaped = value.replace("\\", "\\\\").replace('"', '\\"').replace("\n", "\\n")

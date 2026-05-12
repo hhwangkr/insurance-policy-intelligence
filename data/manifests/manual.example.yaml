@@ -1,4 +1,6 @@
 # Example manifest draft for manually staged public policy PDFs.
+# Workflow: drop downloads under data/inbox/manual/, run scripts/stage_manual_pdf.py,
+# then commit data/raw/manual/ and this manifest. Inbox files are not committed.
 # Merge documents from script output into `documents` as your library grows.
 
 documents:

@@ -10,10 +10,29 @@ from staging_lib import (
     hash8_from_digest_hex,
     manual_pdf_relative_path,
     normalize_key_segment,
+    resolve_manual_source_pdf,
     sha256_hex_file,
     validate_effective_date,
     yaml_double_quoted_scalar,
 )
+
+
+def test_resolve_manual_source_pdf_relative(tmp_path: Path) -> None:
+    inbox = tmp_path / "data" / "inbox" / "manual"
+    inbox.mkdir(parents=True)
+    pdf = inbox / "PolicyBook.pdf"
+    pdf.write_bytes(b"x")
+    resolved = resolve_manual_source_pdf(
+        repo_root=tmp_path, source=Path("data/inbox/manual/PolicyBook.pdf")
+    )
+    assert resolved == pdf.resolve()
+
+
+def test_resolve_manual_source_pdf_absolute(tmp_path: Path) -> None:
+    pdf = tmp_path / "elsewhere.pdf"
+    pdf.write_bytes(b"y")
+    resolved = resolve_manual_source_pdf(repo_root=tmp_path, source=pdf)
+    assert resolved == pdf.resolve()
 
 
 def test_normalize_key_segment_basic() -> None:

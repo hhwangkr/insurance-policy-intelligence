@@ -37,3 +37,7 @@ dist/
 build/
 *.egg-info/
 *.egg
+
+# Transient manual PDF inbox (keep .gitkeep only)
+data/inbox/manual/*
+!data/inbox/manual/.gitkeep

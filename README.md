@@ -68,7 +68,8 @@ packages/
   shared/         # Shared models/types
 
 data/
-  raw/            # staged PDFs (manual/ and crawled/)
+  inbox/manual/   # transient PDF drop zone (see docs/data-staging.md)
+  raw/            # committed normalized PDFs (manual/ and crawled/)
   processed/      # reserved for processed artifacts
   manifests/      # YAML manifest drafts
 
