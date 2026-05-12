@@ -2,6 +2,7 @@
 name = "insurance-policy-intelligence"
 version = "0.1.0"
 description = "Monorepo workspace root for the insurance policy intelligence platform."
+readme = "README.md"
 requires-python = ">=3.12"
 
 [tool.uv]
