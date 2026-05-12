@@ -8,6 +8,10 @@ requires-python = ">=3.12"
 [tool.uv]
 managed = true
 
+[tool.uv.sources]
+insurance-ai-ingestion = { workspace = true }
+insurance-ai-shared = { workspace = true }
+
 [tool.uv.workspace]
 members = [
     "apps/api",
@@ -21,6 +25,8 @@ members = [
 [dependency-groups]
 dev = [
     "httpx>=0.28",
+    "insurance-ai-ingestion",
+    "insurance-ai-shared",
     "mypy>=1.13",
     "pre-commit>=4.0",
     "pydantic>=2.10",
@@ -34,8 +40,13 @@ dev = [
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
 asyncio_default_fixture_loop_scope = "function"
-testpaths = ["apps/api/tests", "scripts/tests"]
-pythonpath = ["apps/api/src", "scripts"]
+testpaths = ["apps/api/tests", "scripts/tests", "packages/ingestion/tests"]
+pythonpath = [
+    "apps/api/src",
+    "scripts",
+    "packages/shared/src",
+    "packages/ingestion/src",
+]
 
 [tool.ruff]
 target-version = "py312"

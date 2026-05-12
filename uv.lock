@@ -401,6 +401,18 @@ source = { editable = "packages/evaluation" }
 name = "insurance-ai-ingestion"
 version = "0.1.0"
 source = { editable = "packages/ingestion" }
+dependencies = [
+    { name = "insurance-ai-shared" },
+    { name = "pymupdf" },
+    { name = "pyyaml" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "insurance-ai-shared", editable = "packages/shared" },
+    { name = "pymupdf", specifier = ">=1.24" },
+    { name = "pyyaml", specifier = ">=6" },
+]
 
 [[package]]
 name = "insurance-ai-retrieval"
@@ -426,6 +438,8 @@ source = { virtual = "." }
 [package.dev-dependencies]
 dev = [
     { name = "httpx" },
+    { name = "insurance-ai-ingestion" },
+    { name = "insurance-ai-shared" },
     { name = "mypy" },
     { name = "pre-commit" },
     { name = "pydantic" },
@@ -441,6 +455,8 @@ dev = [
 [package.metadata.requires-dev]
 dev = [
     { name = "httpx", specifier = ">=0.28" },
+    { name = "insurance-ai-ingestion", editable = "packages/ingestion" },
+    { name = "insurance-ai-shared", editable = "packages/shared" },
     { name = "mypy", specifier = ">=1.13" },
     { name = "pre-commit", specifier = ">=4.0" },
     { name = "pydantic", specifier = ">=2.10" },
