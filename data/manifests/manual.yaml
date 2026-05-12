@@ -177,8 +177,7 @@ documents:
       evidence: default:unassigned
 - document_id: miraeassetlife_variable_annuity_variable_annuity_insurance_policy_terms_20260401_76283b26
   insurer: miraeassetlife
-  product_name: 미래에셋생명 변액연금보험 무배당..............................................................
-    21
+  product_name: 미래에셋생명 변액연금보험 무배당.............................................................. 21
   product_type: variable_annuity
   product_slug: variable_annuity_insurance
   document_type: policy_terms
@@ -215,8 +214,7 @@ documents:
       needs_review: false
       evidence: pattern:YYYYMMDD:filename
     product_name:
-      value: 미래에셋생명 변액연금보험 무배당..............................................................
-        21
+      value: 미래에셋생명 변액연금보험 무배당.............................................................. 21
       confidence: high
       needs_review: false
       evidence: pdf_text:keyword:변액연금보험
