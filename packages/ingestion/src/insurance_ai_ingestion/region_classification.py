@@ -18,6 +18,9 @@ def _appendix_heading_line_count(text: str) -> tuple[int, list[str]]:
         elif re.match(r"^\s*별표\s+\d+\s+\S", line):
             n += 1
             evidence.append("heading_line:byeolpyo_plain")
+        elif re.match(r"^\s*별표\s*\d+(?:\s+\S|\S)", line):
+            n += 1
+            evidence.append("heading_line:byeolpyo_plain_compact")
     return n, evidence
 
 

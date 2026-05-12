@@ -51,10 +51,18 @@ _LEGAL_GUIDE_BLOCK_PHRASES: tuple[str, ...] = (
 )
 
 _TOC_LINE = re.compile(r"^[\s\[［【（(]*목\s*차[\s\]］】）)]*$")
-_APPENDIX_PAREN = re.compile(r"^\s*\(\s*별표\s*(\d+)\s*\)\s*(.*)$")
-_APPENDIX_PLAIN = re.compile(r"^\s*별표\s*(\d+)\s+(.+)$")
-_PART = re.compile(r"^\s*(제\s*\d+\s*관)\s+(.+)$")
+_APPENDIX_PAREN = re.compile(r"^\s*[\(（]\s*별표\s*(\d+)\s*[\)）]\s*(.*)$")
+_APPENDIX_PLAIN = re.compile(r"^\s*별표\s*(\d+)\s*(.+)$")
+_PART = re.compile(r"^\s*(제\s*\d+\s*관)\s*(.+)$")
 _ARTICLE = re.compile(r"^\s*(제\s*\d+\s*조)\s*(.*)$")
+
+_ARTICLE_APPENDIX_PROSE_OPENERS: tuple[str, ...] = (
+    "이 계약은",
+    "회사는",
+    "계약자는",
+    "보험수익자는",
+    "피보험자는",
+)
 
 _PAGE_POINTER_TAIL = re.compile(
     r"(?:[\.\．]\s*\d{1,4}\s*|\d{1,4}\s*p\s*)$",
@@ -69,6 +77,47 @@ _LEGAL_GUIDE_POINTER = re.compile(
 def _strip_heading_title(raw: str) -> str:
     t = raw.strip()
     return t if len(t) <= 500 else t[:497] + "..."
+
+
+def _collapse_ws(s: str) -> str:
+    return re.sub(r"\s+", "", s)
+
+
+def _article_suppressed_in_appendix_region(
+    candidate: SectionCandidate,
+    full_text: str,
+    end_exclusive: int,
+) -> tuple[bool, str]:
+    """Drop table-style 조 pins inside appendix/table pages (not policy-body articles)."""
+    if candidate.section_type != "article":
+        return False, ""
+    chunk = full_text[candidate.start_char_offset : end_exclusive]
+    lines = chunk.splitlines()
+    if not lines:
+        return False, ""
+    head = lines[0].strip()
+    body = "\n".join(lines[1:]).strip()
+    early_body = body[:1400]
+    compact_head = _collapse_ws(head)
+
+    if re.search(r"제\s*\d+\s*조\s*제\s*\d+\s*항", compact_head):
+        return True, "filter:appendix_article_clause_pin_reference"
+
+    if "(" in head or "（" in head:
+        if ")" not in head and "）" not in head:
+            return True, "filter:appendix_article_incomplete_paren_heading"
+
+    if re.match(r"^\s*제\s*\d+\s*조[（(]", head):
+        if re.search(r"[）)]", head) and len(head) <= 78:
+            return True, "filter:appendix_article_compact_paren_row"
+
+    if any(op in early_body for op in _ARTICLE_APPENDIX_PROSE_OPENERS):
+        return False, ""
+
+    if len(body) >= 220:
+        return False, ""
+
+    return True, "filter:appendix_article_missing_clause_prose"
 
 
 def _legal_heading_line(s: str) -> bool:
@@ -506,6 +555,21 @@ def assemble_document_sections(
             )
             if not legal_ok:
                 trace = trace + [legal_reason]
+                emit = False
+
+        if (
+            emit
+            and c.section_type == "article"
+            and region is not None
+            and region.region_type == "appendix"
+        ):
+            apx_art_sup, apx_art_reason = _article_suppressed_in_appendix_region(
+                c,
+                full_text,
+                next_start,
+            )
+            if apx_art_sup:
+                trace = trace + [apx_art_reason]
                 emit = False
 
         conf = _assembly_confidence(c, region, emit=emit)

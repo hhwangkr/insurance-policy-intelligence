@@ -542,6 +542,132 @@ def test_real_appendix_with_substantive_table_body_still_emitted() -> None:
     assert len(apx) >= 1
 
 
+def test_compact_part_heading_detected_as_part() -> None:
+    doc_id = "doc_compact_gwan"
+    body = "\n".join(
+        [
+            "제2관보험금의지급",
+            "이 관에서는 보험금 지급을 규정합니다.",
+            "제10조 (보험금)",
+            "회사는 보험금을 지급합니다.",
+        ]
+    )
+    pages = [_page(doc_id, 1, body)]
+    doc = Document(
+        document_id=doc_id,
+        metadata=_meta(doc_id),
+        pages=pages,
+        page_count=1,
+        total_char_count=len(body),
+        created_at=datetime.now(UTC),
+    )
+    sections = detect_sections(doc)
+    parts = [s for s in sections if s.section_type == "part"]
+    assert any("제2관" in p.title and "보험금" in p.title for p in parts)
+
+
+def test_part_heading_closes_article_series_compact_gwan() -> None:
+    doc_id = "doc_gwan_splits_articles"
+    pad = "약관 본문입니다. 회사는 피보험자를 보호하기 위해 노력합니다." * 12
+    body = "\n".join(
+        [
+            "제1관 목적 및 용어의 정의",
+            pad,
+            "제35조 (배당금의지급)",
+            "이 계약은 배당금 지급에 관한 사항을 규정합니다." * 2,
+            "제7관분쟁의조정등",
+            "제36조 (분쟁의 조정)",
+            "회사는 분쟁 조정 절차를 안내합니다." * 2,
+            "제37조 (관할법원)",
+            "계약자는 관할 법원에 소를 제기할 수 있습니다." * 2,
+            "제38조 (소멸시효)",
+            "보험금 청구권은 소멸시효가 적용됩니다." * 2,
+        ]
+    )
+    pages = [_page(doc_id, 1, body)]
+    doc = Document(
+        document_id=doc_id,
+        metadata=_meta(doc_id),
+        pages=pages,
+        page_count=1,
+        total_char_count=len(body),
+        created_at=datetime.now(UTC),
+    )
+    sections = detect_sections(doc)
+    arts = [s for s in sections if s.section_type == "article"]
+    titles = [a.title for a in arts]
+    assert any("제35조" in t for t in titles)
+    assert any("제36조" in t for t in titles)
+    assert any("제37조" in t for t in titles)
+    assert any("제38조" in t for t in titles)
+
+    body35 = next(s.text for s in arts if "제35조" in s.title)
+    assert "제36조" not in body35
+    assert "제37조" not in body35
+    assert "제38조" not in body35
+
+
+def test_paren_byeolpyo3_and_plain_compact_appendix_sections_split() -> None:
+    doc_id = "doc_byeolpyo_split"
+    filler2 = "재해 분류 표 및 세부 기준 설명입니다." * 20
+    filler3 = "적립 이율 산출 방식과 세부 예시입니다." * 20
+    body = "\n".join(
+        [
+            "( 별표 2 ) 재해분류표",
+            filler2,
+            "( 별표3 ) 보험금을 지급할 때의 적립이율 계산",
+            filler3,
+            "별표4보험금지급기준표",
+            "별표 세부 배열입니다." * 20,
+        ]
+    )
+    pages = [_page(doc_id, 1, body)]
+    doc = Document(
+        document_id=doc_id,
+        metadata=_meta(doc_id),
+        pages=pages,
+        page_count=1,
+        total_char_count=len(body),
+        created_at=datetime.now(UTC),
+    )
+    sections = detect_sections(doc)
+    apx = [s for s in sections if s.section_type == "appendix"]
+    titles = [a.title for a in apx]
+    assert any("별표 2" in t or "별표2" in t for t in titles)
+    assert any("별표 3" in t or "별표3" in t for t in titles)
+    assert any("별표 4" in t or "별표4" in t for t in titles)
+    assert len(apx) >= 3
+
+
+def test_appendix_region_suppresses_table_style_article_pins() -> None:
+    doc_id = "doc_appendix_article_pins"
+    filler = "표 내용 및 금액 산출 예시입니다." * 25
+    body = "\n".join(
+        [
+            "( 별표 3 ) 보험금 지급기준표",
+            filler,
+            "제22조(계약의소멸)",
+            "셀 참조 주석입니다.",
+            "제33조제1항",
+            "별도 각주입니다.",
+            "제7조제2항",
+            "조항 인용 표기입니다.",
+        ]
+    )
+    pages = [_page(doc_id, 1, body)]
+    doc = Document(
+        document_id=doc_id,
+        metadata=_meta(doc_id),
+        pages=pages,
+        page_count=1,
+        total_char_count=len(body),
+        created_at=datetime.now(UTC),
+    )
+    sections = detect_sections(doc)
+    arts = [s for s in sections if s.section_type == "article"]
+    assert arts == []
+
+
 def test_build_sections_artifact_preserves_document_created_at() -> None:
     doc_id = "doc_artifact"
     pages = [_page(doc_id, 1, "제1조 (목적)\n내용")]
