@@ -352,6 +352,111 @@ def test_toc_like_page_suppresses_article_outline_candidates() -> None:
     assert len(kept_parts_p2) == 1
 
 
+def test_toc_like_backstop_suppresses_kyobo_style_article_pointer() -> None:
+    doc_id = "doc_kyobo_article_pointer"
+    body = "제29조(계약자의임의해지)\n. 39"
+    doc = Document(
+        document_id=doc_id,
+        metadata=_meta(doc_id),
+        pages=[_page(doc_id, 1, body)],
+        page_count=1,
+        total_char_count=len(body),
+        created_at=datetime.now(UTC),
+    )
+    sections = detect_sections(doc)
+    assert [s for s in sections if s.section_type == "article"] == []
+
+
+def test_toc_like_backstop_suppresses_article_pointer_variants() -> None:
+    for body in (
+        "제1조(목적)\n. 57",
+        "제15조 (청약의 철회)\n25p",
+    ):
+        doc_id = "doc_ptr_variant"
+        doc = Document(
+            document_id=doc_id,
+            metadata=_meta(doc_id),
+            pages=[_page(doc_id, 1, body)],
+            page_count=1,
+            total_char_count=len(body),
+            created_at=datetime.now(UTC),
+        )
+        sections = detect_sections(doc)
+        assert [s for s in sections if s.section_type == "article"] == []
+
+
+def test_toc_like_backstop_suppresses_appendix_pointer_two_lines() -> None:
+    doc_id = "doc_apx_ptr"
+    body = "( 별표1 ) 보험금지급기준표\n. 48"
+    doc = Document(
+        document_id=doc_id,
+        metadata=_meta(doc_id),
+        pages=[_page(doc_id, 1, body)],
+        page_count=1,
+        total_char_count=len(body),
+        created_at=datetime.now(UTC),
+    )
+    sections = detect_sections(doc)
+    assert [s for s in sections if s.section_type == "appendix"] == []
+
+
+def test_toc_like_backstop_suppresses_compact_legal_pointer() -> None:
+    doc_id = "doc_legal_ptr"
+    body = "약관에서인용된법령\n. 168"
+    doc = Document(
+        document_id=doc_id,
+        metadata=_meta(doc_id),
+        pages=[_page(doc_id, 1, body)],
+        page_count=1,
+        total_char_count=len(body),
+        created_at=datetime.now(UTC),
+    )
+    sections = detect_sections(doc)
+    assert [s for s in sections if s.section_type == "legal_reference"] == []
+
+
+def test_real_body_article_not_suppressed_when_followed_by_clause_text() -> None:
+    doc_id = "doc_real_article_body"
+    clause = "이 보험계약의 목적은 피보험자의 생존 또는 사망 시 보험금을 지급하는 데 있습니다."
+    body = "제1조(목적)\n" + clause * 2
+    doc = Document(
+        document_id=doc_id,
+        metadata=_meta(doc_id),
+        pages=[_page(doc_id, 1, body)],
+        page_count=1,
+        total_char_count=len(body),
+        created_at=datetime.now(UTC),
+    )
+    sections = detect_sections(doc)
+    arts = [s for s in sections if s.section_type == "article"]
+    assert len(arts) == 1
+    assert arts[0].title.startswith("제1조")
+
+
+def test_real_appendix_with_substantive_table_body_still_emitted() -> None:
+    doc_id = "doc_substantive_appendix"
+    filler = "지급 구분 및 산출 예시에 대한 상세 설명입니다." * 8
+    body = "\n".join(
+        [
+            "제1관 목적 및 용어의 정의",
+            "실제 본문 영역입니다." * 60,
+            "( 별표 1 ) 보험금 지급기준표",
+            filler,
+        ]
+    )
+    doc = Document(
+        document_id=doc_id,
+        metadata=_meta(doc_id),
+        pages=[_page(doc_id, 1, body)],
+        page_count=1,
+        total_char_count=len(body),
+        created_at=datetime.now(UTC),
+    )
+    sections = detect_sections(doc)
+    apx = [s for s in sections if s.section_type == "appendix"]
+    assert len(apx) >= 1
+
+
 def test_build_sections_artifact_preserves_document_created_at() -> None:
     doc_id = "doc_artifact"
     pages = [_page(doc_id, 1, "제1조 (목적)\n내용")]

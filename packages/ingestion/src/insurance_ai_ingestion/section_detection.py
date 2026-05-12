@@ -29,6 +29,7 @@ _STRUCTURE_SUPPRESS_TYPES: frozenset[SectionType] = frozenset(
 
 _MIN_APPENDIX_BODY_CHARS = 100
 _MIN_LEGAL_BODY_CHARS = 120
+_MIN_TOCLIKE_TAIL_SUBSTANTIVE_CHARS = 35
 
 _TOC_LINE = re.compile(r"^[\s\[［【（(]*목\s*차[\s\]］】）)]*$")
 _APPENDIX_PAREN = re.compile(r"^\s*\(\s*별표\s*(\d+)\s*\)\s*(.*)$")
@@ -60,6 +61,9 @@ def _legal_heading_line(s: str) -> bool:
         return False
     if re.match(r"^\s*관련법규\s*\d", t):
         return False
+    compact = re.sub(r"\s+", "", t)
+    if re.match(r"^약관에서인용(?:한|된)법", compact):
+        return True
     if re.match(r"^\s*약관에서\s*인용(?:한|된)\s*법", t):
         return True
     if re.match(r"^\s*관련\s*법규\s*$", t) or re.match(r"^\s*관련\s*법규\s*[:\：]", t):
@@ -84,6 +88,22 @@ def _appendix_plain_line_is_page_pointer(line: str) -> bool:
     if len(s) <= 120 and _PAGE_POINTER_TAIL.search(s):
         return True
     return False
+
+
+def _tail_lines_are_only_page_references(tail: str) -> bool:
+    """True when every non-empty line is a lone page pointer (TOC row continuation)."""
+    if not tail.strip():
+        return False
+    for ln in tail.splitlines():
+        s = ln.strip()
+        if not s:
+            continue
+        if re.fullmatch(r"[\.\．]\s*\d{1,4}", s):
+            continue
+        if re.fullmatch(r"\d{1,4}\s*p?", s, flags=re.IGNORECASE):
+            continue
+        return False
+    return True
 
 
 def _non_pointer_tail_chars(text: str) -> int:
@@ -264,6 +284,47 @@ def _regions_by_page(regions: list[PageRegion]) -> dict[int, PageRegion]:
     return {r.page_number: r for r in regions}
 
 
+def _candidate_is_toc_like_reference_row(
+    candidate: SectionCandidate,
+    full_text: str,
+    end_exclusive: int,
+) -> bool:
+    """TOC row / pointer backstop: suppress regardless of page_region when slice is pointer-only."""
+    chunk = full_text[candidate.start_char_offset : end_exclusive]
+    lines = chunk.splitlines()
+    if not lines:
+        return False
+    head = lines[0].strip()
+    tail = "\n".join(lines[1:]).strip()
+
+    if candidate.section_type == "article":
+        if not re.match(r"^\s*제\s*\d+\s*조", head):
+            return False
+        if _non_pointer_tail_chars(tail) >= _MIN_TOCLIKE_TAIL_SUBSTANTIVE_CHARS:
+            return False
+        return _tail_lines_are_only_page_references(tail)
+
+    if candidate.section_type == "appendix":
+        if not (_APPENDIX_PAREN.match(lines[0]) or _APPENDIX_PLAIN.match(lines[0])):
+            return False
+        if _non_pointer_tail_chars(tail) >= _MIN_TOCLIKE_TAIL_SUBSTANTIVE_CHARS:
+            return False
+        return _tail_lines_are_only_page_references(tail)
+
+    if candidate.section_type == "legal_reference":
+        compact_head = re.sub(r"\s+", "", head)
+        legal_ok = _legal_heading_line(head) or bool(
+            re.match(r"^약관에서인용(?:한|된)법", compact_head),
+        )
+        if not legal_ok:
+            return False
+        if _non_pointer_tail_chars(tail) >= _MIN_TOCLIKE_TAIL_SUBSTANTIVE_CHARS:
+            return False
+        return _tail_lines_are_only_page_references(tail)
+
+    return False
+
+
 def _explicit_front_matter_heading(candidate: SectionCandidate) -> bool:
     """Keep 목차 / 고객권리안내문 anchors on front-matter pages."""
     ev = candidate.evidence
@@ -351,8 +412,22 @@ def assemble_document_sections(
 
     for i, c in enumerate(sorted_cands):
         region = by_page.get(c.start_page)
-        emit, trace = _should_emit_candidate(c, region)
         next_start = next_offset_by_index[i]
+
+        emit: bool
+        trace: list[str]
+        if _candidate_is_toc_like_reference_row(c, full_text, next_start):
+            trace = [
+                f"candidate_rule_confidence:{c.confidence:.4f}",
+                "filter:toc_like_candidate_backstop",
+            ]
+            if region is not None:
+                trace.append(f"page_region:{region.region_type}")
+                trace.append(f"page_region_confidence:{region.confidence:.4f}")
+                trace.extend(f"region_evidence:{e}" for e in region.evidence)
+            emit = False
+        else:
+            emit, trace = _should_emit_candidate(c, region)
 
         if emit and c.section_type == "appendix":
             if not _appendix_slice_has_substantive_body(full_text, c.start_char_offset, next_start):

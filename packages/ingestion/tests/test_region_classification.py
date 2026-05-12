@@ -48,3 +48,34 @@ def test_inline_byeolpyo_reference_does_not_force_appendix_region() -> None:
     regions = HeuristicRegionClassifier().classify_document(doc)
     assert len(regions) == 1
     assert regions[0].region_type != "appendix"
+
+
+def test_many_article_outlines_with_byeolpyo_classified_as_toc_not_appendix() -> None:
+    """TOC pages list many 조 rows and 별표 pointers; TOC should beat appendix region."""
+    doc_id = "doc_toc_beats_appendix"
+    pad = "." * 24
+    lines: list[str] = []
+    for i in range(30):
+        lines.append(f"제{i + 1}조 (항목) {pad} {10 + i}")
+    lines.append(f"( 별표 1 ) 보험금지급기준표 {pad} 48")
+    text = "\n".join(lines)
+    pages = [
+        DocumentPage(
+            document_id=doc_id,
+            page_number=3,
+            text=text,
+            char_count=len(text),
+            extraction_method="pymupdf",
+        ),
+    ]
+    doc = Document(
+        document_id=doc_id,
+        metadata=_meta(doc_id),
+        pages=pages,
+        page_count=1,
+        total_char_count=len(text),
+        created_at=datetime.now(UTC),
+    )
+    regions = HeuristicRegionClassifier().classify_document(doc)
+    assert len(regions) == 1
+    assert regions[0].region_type == "toc"
