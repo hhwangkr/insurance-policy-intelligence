@@ -1,58 +1,62 @@
 ---
-description: Insurance AI engineering rules
+description: Insurance AI engineering rules — stack conventions, RAG/AI constraints, and disciplined minimal changes
 globs:
   - "**/*.py"
 alwaysApply: true
 ---
 
-# Insurance AI Project Rules
+# Insurance AI project rules
 
-## General Principles
+## Execution discipline
+
+- **Think before coding** — Clarify the goal and the smallest viable change before editing; avoid speculative refactors.
+- **Simplicity first** — Prefer the straightforward solution; add abstraction only when it removes real complexity.
+- **Surgical changes** — Limit diffs to what the task requires; no unrelated files, renames, or “cleanup” unless requested.
+- **Goal-driven work** — Implement toward a defined outcome; if scope is unclear, ask or propose success criteria first.
+- **Explicit success criteria** — State what “done” means (tests, behavior, contracts); hold the work to that bar.
+- **Verify before finishing** — Run relevant tests, type checks, or manual verification implied by the change.
+
+## General principles (insurance AI)
 
 - Prioritize maintainability over shortcuts.
 - Prefer explicitness over hidden abstractions.
-- Keep architecture modular and composable.
-- Optimize for production readiness.
+- Keep architecture modular and composable; optimize for production readiness.
 - Avoid tightly coupled code.
+- Hallucination reduction and citation grounding are first-class; never treat the LLM as an infallible oracle.
 
 ---
 
-# Python Rules
+## Python
 
-- Use Python 3.12+
+- Use Python 3.12+.
 - Use type hints everywhere.
-- Use Pydantic v2 models for structured data.
-- Avoid raw dictionaries whenever possible.
-- Prefer dataclasses or typed models.
-- Prefer async-first patterns.
-- Keep functions focused and small.
-- Avoid giant files.
+- Use Pydantic v2 models for structured data; avoid raw dictionaries when a typed model fits.
+- Prefer dataclasses or typed models where Pydantic is not the right layer.
+- Prefer async-first patterns where the stack already uses async.
+- Keep functions focused and small; avoid giant files.
 
 ---
 
-# FastAPI Rules
+## FastAPI
 
-- Keep API routers thin.
-- Do not place business logic inside routers.
+- Keep routers thin; do not put business logic in routers.
 - Use dependency injection explicitly.
 - Separate routers, services, and repositories.
 - Use async endpoints.
 
 ---
 
-# AI System Rules
+## AI system
 
-- All LLM outputs must use structured outputs.
-- Validate model outputs before returning them.
-- Never expose raw model responses directly.
-- Keep prompts in dedicated prompt files.
+- All LLM outputs must use structured outputs; validate before returning.
+- Never expose raw model responses directly to clients.
+- Keep prompts in dedicated prompt files or modules.
 - Separate retrieval, reranking, and reasoning layers.
-- Agent state transitions must be explicit.
-- Avoid hidden prompt chains.
+- Agent state transitions must be explicit; avoid hidden prompt chains.
 
 ---
 
-# RAG Rules
+## RAG
 
 - Use hybrid retrieval patterns.
 - Preserve metadata and document hierarchy.
@@ -61,7 +65,7 @@ alwaysApply: true
 
 ---
 
-# Logging and Observability
+## Logging and observability
 
 - Use structured logging.
 - Add tracing hooks to major workflows.
@@ -70,92 +74,33 @@ alwaysApply: true
 
 ---
 
-# Testing Rules
+## Testing
 
 - Business logic must be independently testable.
 - Add unit tests for critical workflows.
-- Avoid tightly coupling tests to implementation details.
+- Avoid coupling tests to incidental implementation details.
 
 ---
 
-# Code Organization
+## Code organization (monorepo)
 
-Use the following monorepo structure:
+Use this layout; do not introduce parallel top-level `routers/`, `services/`, `agents/`, etc. outside the apps and packages below.
 
-- apps/api/
-  - FastAPI backend application
-  - API routers
-  - app configuration
-  - dependency injection
-  - application startup/shutdown logic
+- **apps/api/** — FastAPI app, routers, configuration, dependency injection, lifespan
+- **apps/web/** — Next.js UI, citations, workflow visualization
+- **packages/agents/** — LangGraph workflows, state, nodes, transitions
+- **packages/retrieval/** — Chunking, embedding, vector and BM25 search, hybrid retrieval, reranking
+- **packages/ingestion/** — PDF parsing, loading, normalization, metadata extraction
+- **packages/evaluation/** — Retrieval, citation, and hallucination evaluation; benchmarks
+- **packages/shared/** — Shared Pydantic models, types, constants, utilities
+- **docs/** — Architecture, retrieval, agent, and evaluation notes
+- **infra/** — Docker, compose, local infrastructure configuration
 
-- apps/web/
-  - Next.js frontend application
-  - user interface
-  - citation display
-  - workflow visualization
-
-- packages/agents/
-  - LangGraph workflows
-  - agent state definitions
-  - agent nodes and transitions
-
-- packages/retrieval/
-  - document chunking
-  - embedding
-  - vector search
-  - BM25 search
-  - hybrid retrieval
-  - reranking
-
-- packages/ingestion/
-  - PDF parsing
-  - document loading
-  - document normalization
-  - metadata extraction
-
-- packages/evaluation/
-  - retrieval evaluation
-  - citation evaluation
-  - hallucination evaluation
-  - benchmark datasets
-
-- packages/shared/
-  - shared Pydantic models
-  - shared types
-  - constants
-  - common utilities
-
-- docs/
-  - architecture notes
-  - retrieval strategy
-  - agent design
-  - evaluation design
-
-- infra/
-  - Docker files
-  - docker-compose
-  - local infrastructure configuration
-
-Avoid creating top-level folders such as:
-
-- routers/
-- services/
-- repositories/
-- agents/
-- retrieval/
-- prompts/
-- evaluation/
-- shared/
-
-unless they are inside the appropriate app or package.
+Avoid creating top-level folders named `routers/`, `services/`, `repositories/`, `agents/`, `retrieval/`, `prompts/`, `evaluation/`, or `shared/` unless they live inside the appropriate app or package.
 
 ---
 
-# Frontend Rules
+## Frontend
 
-- Keep UI minimal and functional.
-- Prioritize clarity over visual complexity.
-- Display citations clearly.
-- Surface reasoning traces where useful.
-```
+- Keep UI minimal and functional; prioritize clarity over visual complexity.
+- Display citations clearly; surface reasoning traces where useful.
