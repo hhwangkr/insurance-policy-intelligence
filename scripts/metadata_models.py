@@ -13,7 +13,10 @@ class FieldInference(BaseModel):
     value: str = ""
     confidence: Confidence = "unknown"
     needs_review: bool = True
-    evidence: str = Field(default="", description="Short machine-readable provenance hint.")
+    evidence: str = Field(
+        default="",
+        description="Short machine-readable provenance hint.",
+    )
 
 
 class StagingManifestEntry(BaseModel):

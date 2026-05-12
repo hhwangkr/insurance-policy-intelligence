@@ -1,6 +1,8 @@
 # Example manifest draft for manually staged public life-insurance policy PDFs.
+#
 # For rule-based batch staging, see `stage_manual_inbox.py`, which writes `manual.yaml`
 # with an `inference` map per field (confidence / needs_review / evidence).
+#
 # Workflow: drop downloads under data/inbox/manual/, run `stage_manual_pdf.py` or
 # `stage_manual_inbox.py`, then commit `data/raw/manual/` and your manifest.
 
@@ -12,7 +14,8 @@ documents:
     product_slug: kyobo_individual_pension_savings
     document_type: policy_terms
     effective_date: "2024-01-15"
-    source_file: data/raw/manual/kyobolife_annuity_individual_pension_savings_policy_terms_20240115_a1b2c3d4.pdf
+    source_file: >-
+      data/raw/manual/kyobolife_annuity_individual_pension_savings_policy_terms_20240115_a1b2c3d4.pdf
     original_filename: "20240115_개인연금저축_통합약관.pdf"
     source_url: ""
     content_hash: "0000000000000000000000000000000000000000000000000000000000000000"

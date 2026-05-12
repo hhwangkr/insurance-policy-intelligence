@@ -109,3 +109,17 @@ def test_yaml_double_quoted_scalar_escapes() -> None:
     assert yaml_double_quoted_scalar('say "hi"') == '"say \\"hi\\""'
     assert yaml_double_quoted_scalar("a\nb") == '"a\\nb"'
     assert yaml_double_quoted_scalar("a\\b") == '"a\\\\b"'
+
+
+def test_format_inbox_staging_preview_block_multiline_not_table() -> None:
+    from inbox_staging import format_inbox_staging_preview_block
+
+    long_name = "보험" * 40 + "_file.pdf"
+    out = format_inbox_staging_preview_block(
+        original_filename=long_name,
+        entry=None,
+        error="effective_date_not_inferred",
+    )
+    assert "\t" not in out
+    assert out.startswith("---\noriginal_filename:")
+    assert repr(long_name) in out

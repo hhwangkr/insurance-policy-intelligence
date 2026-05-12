@@ -1,0 +1,237 @@
+generated_by: stage_manual_inbox
+generated_at: '2026-05-12T06:23:46.900305+00:00'
+documents:
+- document_id: kyobolife_annuity_kyobo_ro_annuity_insurance_policy_terms_20260101_080b9e62
+  insurer: kyobolife
+  product_name: 교보로연금보험
+  product_type: annuity
+  product_slug: kyobo_ro_annuity_insurance
+  document_type: policy_terms
+  effective_date: '2026-01-01'
+  source_file: data/raw/manual/kyobolife_annuity_kyobo_ro_annuity_insurance_policy_terms_20260101_080b9e62.pdf
+  original_filename: 1000341_개인연금저축교보로연금보험_260101 공시용 통합약관.pdf
+  source_url: ''
+  content_hash: 080b9e62869551300ee24d72abda4412822b56b4ed98ef48bc346f5b8fd94b86
+  collection_method: manual_inbox_rules
+  dataset_split: unassigned
+  language: ko
+  collected_at: '2026-05-12T06:23:46.674651+00:00'
+  tags: []
+  notes: rule_extract_needs_review:dataset_split,effective_date,insurer,language
+  inference:
+    insurer:
+      value: kyobolife
+      confidence: medium
+      needs_review: true
+      evidence: keyword:교보
+    document_type:
+      value: policy_terms
+      confidence: high
+      needs_review: false
+      evidence: keyword:보험약관
+    product_type:
+      value: annuity
+      confidence: high
+      needs_review: false
+      evidence: product_signal:연금_product_keywords:primary
+    effective_date:
+      value: '2026-01-01'
+      confidence: medium
+      needs_review: true
+      evidence: pattern:YYMMDD:filename_token
+    product_name:
+      value: 교보로연금보험
+      confidence: high
+      needs_review: false
+      evidence: pdf_text:keyword:교보로연금보험
+    product_slug:
+      value: kyobo_ro_annuity_insurance
+      confidence: high
+      needs_review: false
+      evidence: slug:keyword:교보로연금보험
+    language:
+      value: ko
+      confidence: medium
+      needs_review: true
+      evidence: heuristic:hangul_present
+    dataset_split:
+      value: unassigned
+      confidence: low
+      needs_review: true
+      evidence: default:unassigned
+- document_id: samsunglife_cancer_internet_cancer_insurance_policy_terms_20260101_39af0c18
+  insurer: samsunglife
+  product_name: 인터넷암보험(2404)(갱신형,무배당)
+  product_type: cancer
+  product_slug: internet_cancer_insurance
+  document_type: policy_terms
+  effective_date: '2026-01-01'
+  source_file: data/raw/manual/samsunglife_cancer_internet_cancer_insurance_policy_terms_20260101_39af0c18.pdf
+  original_filename: 1768354550355.pdf
+  source_url: ''
+  content_hash: 39af0c18455da4c98ce2b850838fc32c85d6bd956d0e99366f469030aae3b76d
+  collection_method: manual_inbox_rules
+  dataset_split: unassigned
+  language: ko
+  collected_at: '2026-05-12T06:23:46.772333+00:00'
+  tags: []
+  notes: rule_extract_needs_review:dataset_split,effective_date,language
+  inference:
+    insurer:
+      value: samsunglife
+      confidence: high
+      needs_review: false
+      evidence: keyword:삼성생명
+    document_type:
+      value: policy_terms
+      confidence: high
+      needs_review: false
+      evidence: keyword:보험약관
+    product_type:
+      value: cancer
+      confidence: high
+      needs_review: false
+      evidence: product_signal:cancer_product_keywords:primary
+    effective_date:
+      value: '2026-01-01'
+      confidence: medium
+      needs_review: true
+      evidence: pattern:korean_yyyymmdd
+    product_name:
+      value: 인터넷암보험(2404)(갱신형,무배당)
+      confidence: high
+      needs_review: false
+      evidence: pdf_text:keyword:인터넷암보험
+    product_slug:
+      value: internet_cancer_insurance
+      confidence: high
+      needs_review: false
+      evidence: slug:keyword:인터넷암보험
+    language:
+      value: ko
+      confidence: medium
+      needs_review: true
+      evidence: heuristic:hangul_present
+    dataset_split:
+      value: unassigned
+      confidence: low
+      needs_review: true
+      evidence: default:unassigned
+- document_id: samsunglife_whole_life_balance_whole_life_insurance_policy_terms_20260301_1699395d
+  insurer: samsunglife
+  product_name: 밸런스종신보험(2603)(무배당,보증비용부과형)
+  product_type: whole_life
+  product_slug: balance_whole_life_insurance
+  document_type: policy_terms
+  effective_date: '2026-03-01'
+  source_file: data/raw/manual/samsunglife_whole_life_balance_whole_life_insurance_policy_terms_20260301_1699395d.pdf
+  original_filename: 1774507888225.pdf
+  source_url: ''
+  content_hash: 1699395d64c0073a48573dbd8395b01f4eb5889bdf400777e8a9f9186ab029d8
+  collection_method: manual_inbox_rules
+  dataset_split: unassigned
+  language: ko
+  collected_at: '2026-05-12T06:23:46.823902+00:00'
+  tags: []
+  notes: rule_extract_needs_review:dataset_split,effective_date,language
+  inference:
+    insurer:
+      value: samsunglife
+      confidence: high
+      needs_review: false
+      evidence: keyword:삼성생명
+    document_type:
+      value: policy_terms
+      confidence: high
+      needs_review: false
+      evidence: keyword:보험약관
+    product_type:
+      value: whole_life
+      confidence: high
+      needs_review: false
+      evidence: product_signal:종신:primary
+    effective_date:
+      value: '2026-03-01'
+      confidence: low
+      needs_review: true
+      evidence: pattern:YYMM_parens_inferred_day_01:text
+    product_name:
+      value: 밸런스종신보험(2603)(무배당,보증비용부과형)
+      confidence: high
+      needs_review: false
+      evidence: pdf_text:keyword:밸런스종신보험
+    product_slug:
+      value: balance_whole_life_insurance
+      confidence: high
+      needs_review: false
+      evidence: slug:keyword:밸런스종신보험
+    language:
+      value: ko
+      confidence: medium
+      needs_review: true
+      evidence: heuristic:hangul_present
+    dataset_split:
+      value: unassigned
+      confidence: low
+      needs_review: true
+      evidence: default:unassigned
+- document_id: miraeassetlife_variable_annuity_variable_annuity_insurance_policy_terms_20260401_76283b26
+  insurer: miraeassetlife
+  product_name: 미래에셋생명 변액연금보험 무배당..............................................................
+    21
+  product_type: variable_annuity
+  product_slug: variable_annuity_insurance
+  document_type: policy_terms
+  effective_date: '2026-04-01'
+  source_file: data/raw/manual/miraeassetlife_variable_annuity_variable_annuity_insurance_policy_terms_20260401_76283b26.pdf
+  original_filename: 미래에셋생명+변액연금보험+무배당_약관_20260401.pdf
+  source_url: ''
+  content_hash: 76283b2622ba6f2ec8e829a94206f48dc4d4f6998a58e65d408aa9374aadca67
+  collection_method: manual_inbox_rules
+  dataset_split: unassigned
+  language: ko
+  collected_at: '2026-05-12T06:23:46.892365+00:00'
+  tags: []
+  notes: rule_extract_needs_review:dataset_split,document_type,language
+  inference:
+    insurer:
+      value: miraeassetlife
+      confidence: high
+      needs_review: false
+      evidence: keyword:미래에셋생명
+    document_type:
+      value: policy_terms
+      confidence: medium
+      needs_review: true
+      evidence: keyword:약관
+    product_type:
+      value: variable_annuity
+      confidence: high
+      needs_review: false
+      evidence: product_signal:변액연금:primary
+    effective_date:
+      value: '2026-04-01'
+      confidence: high
+      needs_review: false
+      evidence: pattern:YYYYMMDD:filename
+    product_name:
+      value: 미래에셋생명 변액연금보험 무배당..............................................................
+        21
+      confidence: high
+      needs_review: false
+      evidence: pdf_text:keyword:변액연금보험
+    product_slug:
+      value: variable_annuity_insurance
+      confidence: high
+      needs_review: false
+      evidence: slug:keyword:변액연금보험
+    language:
+      value: ko
+      confidence: medium
+      needs_review: true
+      evidence: heuristic:hangul_present
+    dataset_split:
+      value: unassigned
+      confidence: low
+      needs_review: true
+      evidence: default:unassigned

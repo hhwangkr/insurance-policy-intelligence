@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 import re
 from datetime import date
 from pathlib import Path
@@ -12,6 +13,7 @@ _KOREAN_DATE = re.compile(r"(?P<y>\d{4})년\s*(?P<m>\d{1,2})월\s*(?P<d>\d{1,2})
 _ISO = re.compile(r"(?P<y>20\d{2})-(?P<m>\d{2})-(?P<d>\d{2})")
 _DOT = re.compile(r"(?P<y>20\d{2})\.(?P<m>\d{2})\.(?P<d>\d{2})")
 _COMPACT8 = re.compile(r"(?P<y>20\d{2})(?P<m>\d{2})(?P<d>\d{2})")
+_YYMM_PARENS = re.compile(r"\((?P<yy>\d{2})(?P<mm>\d{2})\)")
 
 
 def extract_pdf_head_text(path: Path, *, max_pages: int = 5) -> str:
@@ -86,6 +88,20 @@ def parse_effective_date_candidates(*, text: str, filename: str) -> list[tuple[s
         if iso:
             upsert(iso, "pattern:korean_yyyymmdd", "medium")
 
+    for hay_yymm in (hay_name, hay_all):
+        for match in _YYMM_PARENS.finditer(hay_yymm):
+            yy = int(match.group("yy"))
+            mm = int(match.group("mm"))
+            year = _yy_to_full_year(yy)
+            iso = _iso_from_ymd(year, mm, 1)
+            if iso:
+                where = "filename" if match.group(0) in hay_name else "text"
+                upsert(
+                    iso,
+                    f"pattern:YYMM_parens_inferred_day_01:{where}",
+                    "low",
+                )
+
     for token in re.split(r"[^0-9]+", hay_name):
         if len(token) == 6 and token.isdigit():
             yy, mm, dd = int(token[:2]), int(token[2:4]), int(token[4:6])
@@ -115,10 +131,11 @@ def infer_effective_date(*, text: str, filename: str) -> FieldInference:
         Literal["high", "medium", "low", "unknown"],
         confidence_raw if confidence_raw in ("high", "medium", "low", "unknown") else "unknown",
     )
+    needs_review = confidence != "high" or "inferred_day_01" in evidence
     return FieldInference(
         value=iso,
         confidence=confidence,
-        needs_review=confidence != "high",
+        needs_review=needs_review,
         evidence=evidence,
     )
 
@@ -189,75 +206,110 @@ def infer_document_type(*, text: str, filename: str) -> FieldInference:
     return FieldInference(value="", confidence="unknown", needs_review=True, evidence="none")
 
 
-def infer_product_type(*, text: str, filename: str) -> FieldInference:
-    hay = f"{filename}\n{text}"
-    if "변액연금" in hay:
+def _collapse_ws(value: str) -> str:
+    return re.sub(r"\s+", " ", value.strip())
+
+
+def _is_savings_pension_disclaimer_line(line: str) -> bool:
+    collapsed = _collapse_ws(line)
+    if "저축(연금) 목적" in collapsed:
+        return True
+    if (
+        "본 상품은 보장성보험으로" in collapsed
+        and "저축(연금) 목적에는 적합하지 않습니다" in collapsed
+    ):
+        return True
+    return False
+
+
+def _filter_lines_excluding_samsung_disclaimer(text: str) -> str:
+    """Remove generic Samsung-style savings/pension disclaimer lines from free text."""
+    kept: list[str] = []
+    for raw in text.splitlines():
+        if _is_savings_pension_disclaimer_line(raw):
+            continue
+        kept.append(raw)
+    return "\n".join(kept)
+
+
+def _classify_product_type_from_hay(hay: str) -> tuple[str, str] | None:
+    """Return (product_type, evidence_suffix) using ordered keyword priority."""
+    if "변액연금보험" in hay or "변액연금" in hay:
+        return "variable_annuity", "변액연금"
+    if "종신보험" in hay or "밸런스종신보험" in hay or "밸런스종신" in hay:
+        return "whole_life", "종신"
+    if (
+        "간편통합암보험" in hay
+        or "통합암보험" in hay
+        or "인터넷암보험" in hay
+        or "암치료보험" in hay
+        or "암보험" in hay
+    ):
+        return "cancer", "cancer_product_keywords"
+    if "개인연금" in hay or "연금보험" in hay:
+        return "annuity", "연금_product_keywords"
+    return None
+
+
+def infer_product_type(*, text: str, filename: str, product_name: str) -> FieldInference:
+    """Infer product type from the chosen product title + filename, not generic disclaimer pages."""
+    filtered_text = _filter_lines_excluding_samsung_disclaimer(text)
+    name = product_name.strip()
+    hay_primary = "\n".join(part for part in (name, filename) if part)
+    hay_secondary = "\n".join(part for part in (filtered_text, filename) if part)
+
+    primary = _classify_product_type_from_hay(hay_primary)
+    if primary is not None:
+        ptype, hint = primary
+        conf: Literal["high", "medium", "low", "unknown"] = "high" if name else "medium"
         return FieldInference(
-            value="variable_annuity",
-            confidence="high",
-            needs_review=False,
-            evidence="keyword:변액연금",
+            value=ptype,
+            confidence=conf,
+            needs_review=conf != "high",
+            evidence=f"product_signal:{hint}:primary",
         )
-    if "개인연금" in hay:
+
+    secondary = _classify_product_type_from_hay(hay_secondary)
+    if secondary is not None:
+        ptype, hint = secondary
         return FieldInference(
-            value="annuity",
-            confidence="high",
-            needs_review=False,
-            evidence="keyword:개인연금",
-        )
-    if "연금보험" in hay:
-        return FieldInference(
-            value="annuity",
+            value=ptype,
             confidence="medium",
             needs_review=True,
-            evidence="keyword:연금보험",
+            evidence=f"product_signal:{hint}:filtered_text",
         )
-    if "연금" in hay and ("보험" in hay or "저축" in hay):
-        return FieldInference(
-            value="annuity",
-            confidence="medium",
-            needs_review=True,
-            evidence="keyword:연금+보험/저축",
-        )
-    if "종신" in hay:
-        return FieldInference(
-            value="whole_life",
-            confidence="medium",
-            needs_review=True,
-            evidence="keyword:종신",
-        )
-    if re.search(r"암", hay):
-        return FieldInference(
-            value="cancer",
-            confidence="low",
-            needs_review=True,
-            evidence="keyword:암",
-        )
+
     return FieldInference(value="", confidence="unknown", needs_review=True, evidence="none")
 
 
 _PRODUCT_NAME_KEYWORDS: tuple[str, ...] = (
-    "변액연금보험",
+    "간편통합암보험",
     "통합암보험",
+    "인터넷암보험",
+    "암치료보험",
+    "변액연금보험",
+    "밸런스종신보험",
+    "교보로연금보험",
+    "개인연금",
     "연금보험",
     "종신보험",
     "암보험",
 )
 
 
-def _collapse_ws(value: str) -> str:
-    return re.sub(r"\s+", " ", value.strip())
-
-
 def _is_generic_product_name_line(line: str) -> bool:
     """True for common cover / ToC / boilerplate lines that are not product titles."""
     collapsed = _collapse_ws(line)
     lowered = collapsed.lower()
+    if _is_savings_pension_disclaimer_line(line):
+        return True
     if collapsed in {"보험약관", "목 차", "목차", "고객권리안내문"}:
         return True
     if "고객권리안내문" in collapsed:
         return True
     if "약관 이용 guide book" in lowered:
+        return True
+    if collapsed.startswith("본 상품은 보장성보험으로"):
         return True
     if collapsed.startswith("목차"):
         return True
@@ -307,22 +359,54 @@ def infer_product_name(*, text: str, filename: str) -> FieldInference:
     return FieldInference(value="", confidence="unknown", needs_review=True, evidence="none")
 
 
-def infer_product_slug(*, product_name: str) -> FieldInference:
-    try:
-        slug = normalize_key_segment(product_name)
-    except ValueError:
-        slug = "unknown_product"
-        return FieldInference(
-            value=slug,
-            confidence="low",
-            needs_review=True,
-            evidence="slug:fallback_unknown_product",
-        )
+_SLUG_KEYWORDS: tuple[tuple[str, str], ...] = (
+    ("간편통합암보험", "easy_integrated_cancer_insurance"),
+    ("통합암보험", "integrated_cancer_insurance"),
+    ("인터넷암보험", "internet_cancer_insurance"),
+    ("암치료보험", "cancer_treatment_insurance"),
+    ("변액연금보험", "variable_annuity_insurance"),
+    ("밸런스종신보험", "balance_whole_life_insurance"),
+    ("교보로연금보험", "kyobo_ro_annuity_insurance"),
+    ("개인연금", "personal_pension"),
+    ("연금보험", "annuity_insurance"),
+    ("종신보험", "whole_life_insurance"),
+    ("암보험", "cancer_insurance"),
+)
+
+
+def infer_product_slug(*, product_name: str, product_type: str) -> FieldInference:
+    """Deterministic English slug from known Korean tokens, ASCII, or type-scoped hash."""
+    collapsed = _collapse_ws(product_name)
+    for keyword, slug in _SLUG_KEYWORDS:
+        if keyword in collapsed:
+            return FieldInference(
+                value=slug,
+                confidence="high",
+                needs_review=False,
+                evidence=f"slug:keyword:{keyword}",
+            )
+
+    latin = re.sub(r"[^A-Za-z0-9]+", " ", collapsed).strip()
+    if latin:
+        try:
+            slug = normalize_key_segment(latin)
+        except ValueError:
+            pass
+        else:
+            return FieldInference(
+                value=slug,
+                confidence="medium",
+                needs_review=True,
+                evidence="slug:ascii_normalized",
+            )
+
+    digest = hashlib.sha256(collapsed.encode("utf-8")).hexdigest()[:8]
+    slug = f"{product_type}_{digest}"
     return FieldInference(
         value=slug,
-        confidence="medium",
+        confidence="low",
         needs_review=True,
-        evidence="slug:normalized_product_name",
+        evidence="slug:hash8_fallback",
     )
 
 

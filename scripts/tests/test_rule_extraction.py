@@ -3,14 +3,13 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any, cast
 
-import pytest
-
 from metadata_models import FieldInference, StagingManifestEntry
 from rule_extraction import (
     infer_document_type,
     infer_effective_date,
     infer_insurer,
     infer_product_name,
+    infer_product_slug,
     infer_product_type,
     parse_effective_date_candidates,
 )
@@ -28,7 +27,7 @@ def test_infer_product_name_selects_samsung_internet_cancer() -> None:
     text = "보험약관\n삼성 인터넷암보험\n"
     field = infer_product_name(text=text, filename="x.pdf")
     assert "삼성 인터넷암보험" in field.value
-    assert "암보험" in field.evidence
+    assert "인터넷암보험" in field.evidence
 
 
 def test_infer_product_name_selects_kyobo_integrated_cancer() -> None:
@@ -73,9 +72,73 @@ def test_infer_insurer_kyobo_from_filename() -> None:
 
 def test_infer_product_type_annuity_from_korean() -> None:
     hay = "개인연금저축 상품"
-    field = infer_product_type(text=hay, filename="a.pdf")
+    field = infer_product_type(text=hay, filename="a.pdf", product_name=hay)
     assert field.value == "annuity"
     assert field.confidence == "high"
+
+
+def test_infer_product_type_samsung_disclaimer_does_not_force_annuity() -> None:
+    disclaimer = (
+        "본 상품은 보장성보험으로 은행의 예ㆍ적금과는 다른 상품이고, "
+        "저축(연금) 목적에는 적합하지 않습니다."
+    )
+    text = f"{disclaimer}\n삼성 인터넷암보험\n"
+    name = infer_product_name(text=text, filename="cover.pdf")
+    field = infer_product_type(text=text, filename="cover.pdf", product_name=name.value)
+    assert field.value == "cancer"
+
+
+def test_infer_product_type_samsung_internet_cancer_from_title() -> None:
+    title = "삼성 인터넷암보험"
+    field = infer_product_type(text="", filename="x.pdf", product_name=title)
+    assert field.value == "cancer"
+
+
+def test_infer_product_type_samsung_balance_whole_life_from_title() -> None:
+    title = "삼성 밸런스종신보험"
+    field = infer_product_type(text="", filename="x.pdf", product_name=title)
+    assert field.value == "whole_life"
+
+
+def test_infer_product_type_kyobo_personal_pension_annuity() -> None:
+    title = "개인연금저축 교보로연금보험"
+    field = infer_product_type(text="", filename="x.pdf", product_name=title)
+    assert field.value == "annuity"
+
+
+def test_infer_product_type_mirae_variable_annuity() -> None:
+    title = "미래에셋생명 변액연금보험"
+    field = infer_product_type(text="", filename="x.pdf", product_name=title)
+    assert field.value == "variable_annuity"
+
+
+def test_infer_effective_date_korean_yyyy_m_d() -> None:
+    field = infer_effective_date(text="기준일 2026년 1월 1일", filename="x.pdf")
+    assert field.value == "2026-01-01"
+
+
+def test_infer_effective_date_korean_yyyy_mm_dd() -> None:
+    field = infer_effective_date(text="2026년 04월 01일", filename="x.pdf")
+    assert field.value == "2026-04-01"
+
+
+def test_parse_effective_date_yymm_parens_in_filename() -> None:
+    cands = parse_effective_date_candidates(text="", filename="삼성_상품(2603)_약관.pdf")
+    assert any(iso == "2026-03-01" for iso, ev, _c in cands)
+    assert any("inferred_day_01" in ev for iso, ev, _c in cands if iso == "2026-03-01")
+
+
+def test_infer_effective_date_yymm_parens_needs_review() -> None:
+    field = infer_effective_date(text="", filename="only_(2603)_here.pdf")
+    assert field.value == "2026-03-01"
+    assert field.needs_review is True
+    assert "inferred_day_01" in field.evidence
+
+
+def test_infer_product_slug_keyword_prefers_english_token() -> None:
+    slug = infer_product_slug(product_name="삼성 인터넷암보험", product_type="cancer")
+    assert slug.value == "internet_cancer_insurance"
+    assert slug.needs_review is False
 
 
 def test_infer_document_type_policy_terms() -> None:
@@ -150,23 +213,20 @@ def test_manifest_entry_inference_flags() -> None:
 
 
 def test_build_staging_manifest_entry_smoke(tmp_path: Path) -> None:
-    pytest.importorskip("fitz")
-    import fitz
+    from unittest.mock import patch
 
     from inbox_staging import build_staging_manifest_entry
 
     inbox = tmp_path / "data" / "inbox" / "manual"
     inbox.mkdir(parents=True)
-    pdf_path = inbox / "1000341_개인연금저축교보로연금보험_260101 공시용 통합약관.pdf"
-    doc = fitz.open()
-    try:
-        page = doc.new_page()
-        page.insert_text((72, 72), "교보생명 개인연금보험 보험약관")
-        doc.save(pdf_path)
-    finally:
-        doc.close()
+    pdf_path = inbox / "kyobo_260101.pdf"
+    pdf_path.write_bytes(b"not-empty")
 
-    entry, err = build_staging_manifest_entry(pdf_path=pdf_path, repo_root=tmp_path, max_pages=3)
+    head = "교보생명 개인연금보험 보험약관\n"
+    with patch("inbox_staging.extract_pdf_head_text", return_value=head):
+        entry, err = build_staging_manifest_entry(
+            pdf_path=pdf_path, repo_root=tmp_path, max_pages=3
+        )
     assert err == ""
     assert entry is not None
     assert entry.insurer == "kyobolife"
@@ -177,4 +237,5 @@ def test_build_staging_manifest_entry_smoke(tmp_path: Path) -> None:
     assert entry.original_filename == pdf_path.name
     assert entry.source_file.startswith("data/raw/manual/")
     assert entry.content_hash == sha256_hex_file(pdf_path)
+    assert entry.product_slug == "personal_pension"
     assert any(field.needs_review for field in entry.inference.values())
