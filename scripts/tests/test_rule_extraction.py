@@ -10,10 +10,50 @@ from rule_extraction import (
     infer_document_type,
     infer_effective_date,
     infer_insurer,
+    infer_product_name,
     infer_product_type,
     parse_effective_date_candidates,
 )
-from staging_lib import build_storage_basename, sha256_hex_file
+from staging_lib import build_storage_basename, sha256_hex_file, validate_effective_date
+
+
+def test_infer_product_name_skips_generic_cover_lines() -> None:
+    text = "보험약관\n목 차\n고객권리안내문\n약관 이용 Guide Book\n삼성 인터넷암보험\n"
+    field = infer_product_name(text=text, filename="cover.pdf")
+    assert field.value.strip() == "삼성 인터넷암보험"
+    assert field.evidence.startswith("pdf_text:keyword:")
+
+
+def test_infer_product_name_selects_samsung_internet_cancer() -> None:
+    text = "보험약관\n삼성 인터넷암보험\n"
+    field = infer_product_name(text=text, filename="x.pdf")
+    assert "삼성 인터넷암보험" in field.value
+    assert "암보험" in field.evidence
+
+
+def test_infer_product_name_selects_kyobo_integrated_cancer() -> None:
+    text = "약관 이용 Guide Book\n교보간편통합암보험\n"
+    field = infer_product_name(text=text, filename="x.pdf")
+    assert "교보간편통합암보험" in field.value
+    assert "통합암보험" in field.evidence
+
+
+def test_storage_basename_uses_yyyymmdd_manifest_iso_preserved(tmp_path: Path) -> None:
+    pdf = tmp_path / "p.pdf"
+    pdf.write_bytes(b"x")
+    digest = sha256_hex_file(pdf)
+    iso = "2026-01-01"
+    basename = build_storage_basename(
+        insurer="kyobolife",
+        product_type="annuity",
+        product_slug="pension",
+        document_type="policy_terms",
+        effective_date=iso,
+        content_hash_hex=digest,
+    )
+    assert "20260101" in basename
+    assert "2026-01-01" not in basename
+    assert validate_effective_date(iso) == "2026-01-01"
 
 
 def test_infer_insurer_samsunglife_high() -> None:
@@ -68,6 +108,8 @@ def test_build_storage_basename_with_inferred_segments(tmp_path: Path) -> None:
     )
     assert name.endswith(".pdf")
     assert digest[:8] in name
+    assert "20260101" in name
+    assert "2026-01-01" not in name
 
 
 def test_manifest_entry_inference_flags() -> None:
@@ -100,10 +142,10 @@ def test_manifest_entry_inference_flags() -> None:
         inference=inference,
     )
     dumped = entry.to_yaml_dict()
-    inference = cast(dict[str, Any], dumped["inference"])
-    ds = cast(dict[str, Any], inference["dataset_split"])
+    inf_map = cast(dict[str, Any], dumped["inference"])
+    ds = cast(dict[str, Any], inf_map["dataset_split"])
     assert ds["needs_review"] is True
-    ins = cast(dict[str, Any], inference["insurer"])
+    ins = cast(dict[str, Any], inf_map["insurer"])
     assert ins["needs_review"] is False
 
 
@@ -131,6 +173,7 @@ def test_build_staging_manifest_entry_smoke(tmp_path: Path) -> None:
     assert entry.product_type == "annuity"
     assert entry.document_type == "policy_terms"
     assert entry.effective_date == "2026-01-01"
+    assert "20260101" in entry.source_file
     assert entry.original_filename == pdf_path.name
     assert entry.source_file.startswith("data/raw/manual/")
     assert entry.content_hash == sha256_hex_file(pdf_path)

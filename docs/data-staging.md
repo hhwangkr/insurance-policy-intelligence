@@ -25,14 +25,16 @@ This document describes how **manually collected** public insurance disclosure P
 Files under `data/raw/manual/` use:
 
 ```text
-{insurer}_{product_type}_{product_slug}_{document_type}_{effective_date}_{hash8}.pdf
+{insurer}_{product_type}_{product_slug}_{document_type}_{effective_date_compact}_{hash8}.pdf
 ```
 
 Where:
 
 - `hash8` is the first 8 hexadecimal characters of the file’s **SHA-256** over raw bytes.
-- `effective_date` is ISO `YYYY-MM-DD` (validated by the staging script).
+- `effective_date_compact` is **`YYYYMMDD`** derived from the manifest’s ISO effective date (`YYYY-MM-DD`).
 - Other segments are user-supplied labels **normalized** (lowercase, non-alphanumeric runs collapsed to a single `_`, trimmed).
+
+The manifest’s `effective_date` field remains **ISO `YYYY-MM-DD`** for readability and downstream use; only the **storage filename** uses the compact date segment.
 
 `product_name` is **not** part of the storage key; it appears only in the manifest (human-readable).
 
@@ -80,7 +82,7 @@ What it does (still **staging only**—no ingestion, RAG, embeddings, vectors, L
 1. Scans `data/inbox/manual/*.pdf`.
 2. Uses **PyMuPDF** to read plain text from the **first N pages** (default **5**).
 3. Applies **rule-based** heuristics (Korean keywords, filename tokens, simple date regexes) in `scripts/rule_extraction.py`.
-4. Builds normalized `data/raw/manual/{...}_{hash8}.pdf` filenames via `scripts/staging_lib.py`.
+4. Builds normalized `data/raw/manual/{...}_{hash8}.pdf` filenames via `scripts/staging_lib.py` (compact **`YYYYMMDD`** date segment; manifest keeps ISO dates).
 5. Copies bytes into `data/raw/manual/` (unless `--dry-run`).
 6. Writes **`data/manifests/manual.yaml`** with repo-relative `source_file`, full `content_hash`, `original_filename` basename only, and an `inference` block per field (`confidence`, `needs_review`, `evidence`).
 7. Prints a **summary table** before writing so you can spot gaps quickly.

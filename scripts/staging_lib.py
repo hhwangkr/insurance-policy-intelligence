@@ -42,12 +42,18 @@ def normalize_key_segment(value: str) -> str:
 
 
 def validate_effective_date(value: str) -> str:
-    """Validate and return ISO effective date YYYY-MM-DD (used verbatim in the storage key)."""
+    """Validate and return ISO effective date YYYY-MM-DD (manifest and inputs)."""
     candidate = value.strip()
     if not _EFFECTIVE_DATE.fullmatch(candidate):
         msg = "effective_date must be ISO YYYY-MM-DD"
         raise ValueError(msg)
     return candidate
+
+
+def effective_date_storage_segment(iso_date: str) -> str:
+    """Return YYYYMMDD filename segment from a validated ISO date."""
+    iso = validate_effective_date(iso_date)
+    return iso.replace("-", "")
 
 
 def build_storage_basename(
@@ -59,13 +65,16 @@ def build_storage_basename(
     effective_date: str,
     content_hash_hex: str,
 ) -> str:
-    """Build `{segments}.pdf` under data/raw/manual conventions."""
+    """Build `{segments}.pdf` under data/raw/manual conventions.
+
+    ``effective_date`` must be ISO ``YYYY-MM-DD``; the on-disk segment uses ``YYYYMMDD``.
+    """
     parts = [
         normalize_key_segment(insurer),
         normalize_key_segment(product_type),
         normalize_key_segment(product_slug),
         normalize_key_segment(document_type),
-        validate_effective_date(effective_date),
+        effective_date_storage_segment(effective_date),
         hash8_from_digest_hex(content_hash_hex),
     ]
     return "_".join(parts) + ".pdf"

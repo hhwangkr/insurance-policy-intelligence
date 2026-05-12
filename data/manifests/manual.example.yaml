@@ -1,25 +1,24 @@
-# Example manifest draft for manually staged public policy PDFs.
-# For rule-based batch staging, see `stage_manual_inbox.py` which writes `manual.yaml`
+# Example manifest draft for manually staged public life-insurance policy PDFs.
+# For rule-based batch staging, see `stage_manual_inbox.py`, which writes `manual.yaml`
 # with an `inference` map per field (confidence / needs_review / evidence).
-# Workflow: drop downloads under data/inbox/manual/, run scripts/stage_manual_pdf.py,
-# then commit data/raw/manual/ and this manifest. Inbox files are not committed.
-# Merge documents from script output into `documents` as your library grows.
+# Workflow: drop downloads under data/inbox/manual/, run `stage_manual_pdf.py` or
+# `stage_manual_inbox.py`, then commit `data/raw/manual/` and your manifest.
 
 documents:
-  - document_id: example_mutual_auto_sample_auto_policy_2024-01-15_a1b2c3d4
-    insurer: "Example Mutual"
-    product_name: "Sample Auto Policy"
-    product_type: auto
-    product_slug: sample_auto
-    document_type: policy
+  - document_id: kyobolife_annuity_individual_pension_savings_policy_terms_20240115_a1b2c3d4
+    insurer: "교보생명"
+    product_name: "교보개인연금저축보험 (샘플)"
+    product_type: annuity
+    product_slug: kyobo_individual_pension_savings
+    document_type: policy_terms
     effective_date: "2024-01-15"
-    source_file: data/raw/manual/example_mutual_auto_sample_auto_policy_2024-01-15_a1b2c3d4.pdf
-    original_filename: PolicyBook.pdf
+    source_file: data/raw/manual/kyobolife_annuity_individual_pension_savings_policy_terms_20240115_a1b2c3d4.pdf
+    original_filename: "20240115_개인연금저축_통합약관.pdf"
     source_url: ""
     content_hash: "0000000000000000000000000000000000000000000000000000000000000000"
     collection_method: manual
     dataset_split: train
-    language: ""
+    language: "ko"
     collected_at: "2024-01-15T12:00:00+00:00"
     tags: []
     notes: ""

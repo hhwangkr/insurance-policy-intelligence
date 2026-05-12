@@ -236,16 +236,66 @@ def infer_product_type(*, text: str, filename: str) -> FieldInference:
     return FieldInference(value="", confidence="unknown", needs_review=True, evidence="none")
 
 
+_PRODUCT_NAME_KEYWORDS: tuple[str, ...] = (
+    "변액연금보험",
+    "통합암보험",
+    "연금보험",
+    "종신보험",
+    "암보험",
+)
+
+
+def _collapse_ws(value: str) -> str:
+    return re.sub(r"\s+", " ", value.strip())
+
+
+def _is_generic_product_name_line(line: str) -> bool:
+    """True for common cover / ToC / boilerplate lines that are not product titles."""
+    collapsed = _collapse_ws(line)
+    lowered = collapsed.lower()
+    if collapsed in {"보험약관", "목 차", "목차", "고객권리안내문"}:
+        return True
+    if "고객권리안내문" in collapsed:
+        return True
+    if "약관 이용 guide book" in lowered:
+        return True
+    if collapsed.startswith("목차"):
+        return True
+    if collapsed.startswith("목 차"):
+        return True
+    return False
+
+
 def infer_product_name(*, text: str, filename: str) -> FieldInference:
-    lines = [ln.strip() for ln in text.splitlines() if ln.strip()]
-    for line in lines[:12]:
-        if len(line) >= 6:
+    """Pick a product title from head text; skip boilerplate; prefer known product keywords."""
+    lines = [_collapse_ws(ln) for ln in text.splitlines() if _collapse_ws(ln)]
+    scoped = lines[:40]
+
+    for keyword in _PRODUCT_NAME_KEYWORDS:
+        for line in scoped:
+            if keyword not in line:
+                continue
+            if _is_generic_product_name_line(line):
+                continue
             return FieldInference(
                 value=line[:200],
-                confidence="medium",
-                needs_review=True,
-                evidence="pdf_text:first_substantial_line",
+                confidence="high",
+                needs_review=False,
+                evidence=f"pdf_text:keyword:{keyword}",
             )
+
+    for line in scoped:
+        if len(line) < 6:
+            continue
+        if _is_generic_product_name_line(line):
+            continue
+        return FieldInference(
+            value=line[:200],
+            confidence="medium",
+            needs_review=True,
+            evidence="pdf_text:first_non_generic_line",
+        )
+
     stem = Path(filename).stem
     if stem:
         return FieldInference(

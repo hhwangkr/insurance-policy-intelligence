@@ -7,6 +7,7 @@ import pytest
 from staging_lib import (
     build_document_id,
     build_storage_basename,
+    effective_date_storage_segment,
     hash8_from_digest_hex,
     manual_pdf_relative_path,
     normalize_key_segment,
@@ -54,6 +55,10 @@ def test_validate_effective_date_rejects_invalid() -> None:
         validate_effective_date("15-01-2024")
 
 
+def test_effective_date_storage_segment() -> None:
+    assert effective_date_storage_segment("2024-01-15") == "20240115"
+
+
 def test_hash8_from_digest_hex() -> None:
     digest = "2cf24dba5fb0a30e26e83b2ac5b9e29e1b161e5c1fa7425e73043362938b9824"
     assert hash8_from_digest_hex(digest) == "2cf24dba"
@@ -89,12 +94,14 @@ def test_build_storage_basename(tmp_path: Path) -> None:
     )
     assert basename.endswith(".pdf")
     assert digest[:8] in basename
-    assert basename.startswith("acme_co_auto_sample_auto_policy_2024-01-15_")
+    assert "20240115" in basename
+    assert "2024-01-15" not in basename
+    assert basename.startswith("acme_co_auto_sample_auto_policy_20240115_")
 
 
 def test_build_document_id_and_relative_path() -> None:
-    basename = "acme_auto_sample_policy_2024-01-15_deadbeef.pdf"
-    assert build_document_id(basename) == "acme_auto_sample_policy_2024-01-15_deadbeef"
+    basename = "acme_auto_sample_policy_terms_20240115_deadbeef.pdf"
+    assert build_document_id(basename) == "acme_auto_sample_policy_terms_20240115_deadbeef"
     assert manual_pdf_relative_path(basename) == f"data/raw/manual/{basename}"
 
 
