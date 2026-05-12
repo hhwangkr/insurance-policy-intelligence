@@ -318,6 +318,23 @@ def _is_generic_product_name_line(line: str) -> bool:
     return False
 
 
+_TOC_PRODUCT_TRAIL = re.compile(r"(?:[.\u00b7\u2024\u2025\u2026‧…．\s]){3,}\s*\d{1,4}\s*$")
+
+
+def clean_product_name_from_toc(value: str) -> str:
+    """Remove TOC dot leaders and trailing page numbers from the end of a product title."""
+    s = value.strip()
+    while True:
+        nxt = _TOC_PRODUCT_TRAIL.sub("", s).strip()
+        if nxt == s:
+            return nxt
+        s = nxt
+
+
+def _finalize_product_name_value(value: str) -> str:
+    return clean_product_name_from_toc(value)[:200]
+
+
 def infer_product_name(*, text: str, filename: str) -> FieldInference:
     """Pick a product title from head text; skip boilerplate; prefer known product keywords."""
     lines = [_collapse_ws(ln) for ln in text.splitlines() if _collapse_ws(ln)]
@@ -330,7 +347,7 @@ def infer_product_name(*, text: str, filename: str) -> FieldInference:
             if _is_generic_product_name_line(line):
                 continue
             return FieldInference(
-                value=line[:200],
+                value=_finalize_product_name_value(line),
                 confidence="high",
                 needs_review=False,
                 evidence=f"pdf_text:keyword:{keyword}",
@@ -342,7 +359,7 @@ def infer_product_name(*, text: str, filename: str) -> FieldInference:
         if _is_generic_product_name_line(line):
             continue
         return FieldInference(
-            value=line[:200],
+            value=_finalize_product_name_value(line),
             confidence="medium",
             needs_review=True,
             evidence="pdf_text:first_non_generic_line",
@@ -351,7 +368,7 @@ def infer_product_name(*, text: str, filename: str) -> FieldInference:
     stem = Path(filename).stem
     if stem:
         return FieldInference(
-            value=stem[:200],
+            value=_finalize_product_name_value(stem),
             confidence="low",
             needs_review=True,
             evidence="filename:stem_fallback",

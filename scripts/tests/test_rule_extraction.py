@@ -5,6 +5,7 @@ from typing import Any, cast
 
 from metadata_models import FieldInference, StagingManifestEntry
 from rule_extraction import (
+    clean_product_name_from_toc,
     infer_document_type,
     infer_effective_date,
     infer_insurer,
@@ -35,6 +36,24 @@ def test_infer_product_name_selects_kyobo_integrated_cancer() -> None:
     field = infer_product_name(text=text, filename="x.pdf")
     assert "교보간편통합암보험" in field.value
     assert "통합암보험" in field.evidence
+
+
+def test_clean_product_name_from_toc_strips_dot_leaders_and_page_number() -> None:
+    raw = (
+        "미래에셋생명 변액연금보험 무배당"
+        ".............................................................. 21"
+    )
+    assert clean_product_name_from_toc(raw) == "미래에셋생명 변액연금보험 무배당"
+
+
+def test_infer_product_name_strips_toc_dot_leaders_when_keyword_matches() -> None:
+    text = (
+        "표지\n"
+        "미래에셋생명 변액연금보험 무배당"
+        ".............................................................. 21\n"
+    )
+    field = infer_product_name(text=text, filename="x.pdf")
+    assert field.value == "미래에셋생명 변액연금보험 무배당"
 
 
 def test_storage_basename_uses_yyyymmdd_manifest_iso_preserved(tmp_path: Path) -> None:
