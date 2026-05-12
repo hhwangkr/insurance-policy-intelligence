@@ -3,6 +3,9 @@ from insurance_ai_shared.models.health import HealthCheckResponse, HealthStatus
 from insurance_ai_shared.models.section import (
     DocumentSection,
     DocumentSectionsArtifact,
+    PageRegion,
+    RegionType,
+    SectionCandidate,
     SectionType,
 )
 
@@ -12,6 +15,9 @@ __all__ = [
     "DocumentPage",
     "DocumentSection",
     "DocumentSectionsArtifact",
+    "PageRegion",
+    "RegionType",
+    "SectionCandidate",
     "SectionType",
     "HealthCheckResponse",
     "HealthStatus",

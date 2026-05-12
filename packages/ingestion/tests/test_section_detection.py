@@ -2,7 +2,12 @@ from __future__ import annotations
 
 from datetime import UTC, date, datetime
 
-from insurance_ai_ingestion.section_detection import build_sections_artifact, detect_sections
+from insurance_ai_ingestion.section_detection import (
+    build_sections_artifact,
+    collect_section_candidates,
+    detect_sections,
+    run_section_detection,
+)
 from insurance_ai_shared.models.document import Document, DocumentMetadata, DocumentPage
 
 
@@ -184,6 +189,74 @@ def test_empty_pages_do_not_break_detection() -> None:
     sections = detect_sections(doc)
     assert len(sections) >= 1
     assert any(s.section_type == "part" for s in sections)
+
+
+def test_build_sections_artifact_includes_regions_and_candidates() -> None:
+    doc_id = "doc_artifact_enriched"
+    pages = [_page(doc_id, 1, "제1조 (목적)\n내용")]
+    created = datetime(2026, 3, 1, 12, 0, tzinfo=UTC)
+    doc = Document(
+        document_id=doc_id,
+        metadata=_meta(doc_id),
+        pages=pages,
+        page_count=1,
+        total_char_count=len(pages[0].text),
+        created_at=created,
+    )
+    art = build_sections_artifact(document=doc)
+    assert art.document_id == doc_id
+    assert len(art.page_regions) == 1
+    assert art.page_regions[0].page_number == 1
+    assert len(art.section_candidates) >= 1
+
+
+def test_toc_like_page_suppresses_article_outline_candidates() -> None:
+    """Many dotted TOC lines + 조 outlines should not become article sections."""
+    doc_id = "doc_toc_noise"
+    pad = "." * 48
+    dotted_toc = "\n".join(
+        [
+            "[ 목 차 ]",
+            f"미래에셋생명 변액연금보험 무배당{pad} 3",
+            f"제1조 (목적) {pad} 10",
+            f"제2조 (용어의 정의) {pad} 11",
+            f"제3조 (보험금의 지급사유) {pad} 12",
+            f"제5조 (보험금을 지급하지 않는 사유) {pad} 13",
+        ]
+    )
+    body = "\n".join(
+        [
+            "제1관 목적 및 용어의 정의",
+            "실제 약관 본문이 시작됩니다.",
+            "제1조 (목적)",
+            "계약 목적 조항 본문입니다.",
+        ]
+    )
+    pages = [
+        _page(doc_id, 1, dotted_toc),
+        _page(doc_id, 2, body),
+    ]
+    doc = Document(
+        document_id=doc_id,
+        metadata=_meta(doc_id),
+        pages=pages,
+        page_count=2,
+        total_char_count=sum(p.char_count for p in pages),
+        created_at=datetime.now(UTC),
+    )
+    candidates = collect_section_candidates(doc)
+    article_like = [c for c in candidates if c.section_type == "article"]
+    assert len(article_like) >= 5
+
+    sections, _, regions = run_section_detection(doc)
+    p1_region = next(r for r in regions if r.page_number == 1)
+    assert p1_region.region_type == "toc"
+
+    kept_articles_p1 = [s for s in sections if s.section_type == "article" and s.start_page == 1]
+    assert kept_articles_p1 == []
+
+    kept_parts_p2 = [s for s in sections if s.section_type == "part" and s.start_page == 2]
+    assert len(kept_parts_p2) == 1
 
 
 def test_build_sections_artifact_preserves_document_created_at() -> None:
