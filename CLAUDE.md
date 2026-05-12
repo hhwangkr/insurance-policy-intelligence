@@ -64,13 +64,11 @@ Define success criteria. Loop until verified.
 - Strong criteria let you loop independently; weak criteria (“make it work”) require constant clarification.
 - Run the relevant tests, linters, or manual checks the task implies. Do not claim completion without evidence that the success criteria are met.
 
-For multi-step tasks, state a brief plan:
+For multi-step tasks, state a brief plan (one line per step, each with an explicit verify check):
 
-```text
-1. [Step] → verify: [check]
-2. [Step] → verify: [check]
-3. [Step] → verify: [check]
-```
+- `1. [Step] → verify: [check]`
+- `2. [Step] → verify: [check]`
+- `3. [Step] → verify: [check]`
 
 Iterative development is still the default: iterate in **small, verified steps**, not large speculative rewrites. If the goal shifts, stop and realign instead of accumulating diff.
 
