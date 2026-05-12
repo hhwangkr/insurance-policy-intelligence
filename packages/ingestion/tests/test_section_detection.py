@@ -116,23 +116,28 @@ def test_detects_gwan_and_article_parent_and_pages() -> None:
 
 
 def test_appendix_legal_and_glossary_headings() -> None:
+    """Policy-body page with substantive tails after each heading (not front-matter guide)."""
     doc_id = "doc_appendix_sample"
+    filler_a = "별표 본문 설명입니다." * 12
+    filler_b = "특별약관 관련 본문입니다." * 12
+    filler_l = "민법 및 보험업법 등 관련 법령 조항을 인용합니다." * 6
+    filler_g = "보험 용어에 대한 해설 문단입니다." * 10
     pages = [
         _page(
             doc_id,
             1,
             "\n".join(
                 [
+                    "제1관 목적 및 용어의 정의",
+                    "본 문서는 약관 본문 영역으로 분류되도록 충분히 길게 작성합니다." * 30,
                     "( 별표 1 ) 보험금 지급기준표",
-                    "내용",
+                    filler_a,
                     "별표 2 특별약관",
-                    "내용2",
+                    filler_b,
                     "약관에서 인용한 법·규정",
-                    "법령 목록",
+                    filler_l,
                     "보험용어 해설",
-                    "용어 설명",
-                    "고객권리안내문",
-                    "권리 안내",
+                    filler_g,
                 ]
             ),
         ),
@@ -150,7 +155,95 @@ def test_appendix_legal_and_glossary_headings() -> None:
     assert "appendix" in kinds
     assert "legal_reference" in kinds
     assert "glossary" in kinds
-    assert "guide" in kinds
+
+
+def test_toc_appendix_pointer_not_emitted_as_section() -> None:
+    doc_id = "doc_toc_appendix_pointer"
+    pad = "." * 40
+    toc_block = "\n".join(
+        [
+            "[ 목 차 ]",
+            f"( 별표1 ) 보험금지급기준표{pad} 48",
+            f"( 별표2 ) 재해분류표{pad} 50",
+        ]
+    )
+    body = "\n".join(
+        [
+            "제1관 목적 및 용어의 정의",
+            "실제 약관 본문입니다." * 40,
+            "제1조 (목적)",
+            "계약의 목적은 ...",
+        ]
+    )
+    pages = [_page(doc_id, 1, toc_block), _page(doc_id, 2, body)]
+    doc = Document(
+        document_id=doc_id,
+        metadata=_meta(doc_id),
+        pages=pages,
+        page_count=2,
+        total_char_count=sum(p.char_count for p in pages),
+        created_at=datetime.now(UTC),
+    )
+    sections = detect_sections(doc)
+    toc_appendix = [s for s in sections if s.section_type == "appendix" and s.start_page == 1]
+    assert toc_appendix == []
+
+
+def test_guide_legal_pointer_not_emitted() -> None:
+    doc_id = "doc_guide_legal_pointer"
+    guide_page = "\n".join(
+        [
+            "고객 안내",
+            "관련법규 168p",
+            "관련법규 항목을 활용하시면 편리합니다.",
+        ]
+    )
+    body = "\n".join(
+        [
+            "제1관 목적 및 용어의 정의",
+            "실제 약관 본문입니다." * 40,
+            "제1조 (목적)",
+            "목적 조항 본문입니다.",
+        ]
+    )
+    pages = [_page(doc_id, 1, guide_page), _page(doc_id, 2, body)]
+    doc = Document(
+        document_id=doc_id,
+        metadata=_meta(doc_id),
+        pages=pages,
+        page_count=2,
+        total_char_count=sum(p.char_count for p in pages),
+        created_at=datetime.now(UTC),
+    )
+    sections = detect_sections(doc)
+    legal_on_p1 = [s for s in sections if s.section_type == "legal_reference" and s.start_page == 1]
+    assert legal_on_p1 == []
+
+
+def test_real_appendix_with_substantive_body_emitted() -> None:
+    doc_id = "doc_real_appendix"
+    body_tail = "별표 세부 기준 본문입니다." * 15
+    text = "\n".join(
+        [
+            "제1관 목적 및 용어의 정의",
+            "들여쓰기 없는 긴 본문 영역입니다." * 35,
+            "( 별표 1 ) 보험금 지급기준표",
+            body_tail,
+        ]
+    )
+    pages = [_page(doc_id, 1, text)]
+    doc = Document(
+        document_id=doc_id,
+        metadata=_meta(doc_id),
+        pages=pages,
+        page_count=1,
+        total_char_count=len(text),
+        created_at=datetime.now(UTC),
+    )
+    sections = detect_sections(doc)
+    apx = [s for s in sections if s.section_type == "appendix"]
+    assert len(apx) == 1
+    assert "별표" in apx[0].title
 
 
 def test_section_ids_are_deterministic_across_runs() -> None:

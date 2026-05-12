@@ -23,6 +23,12 @@ _SUPPRESS_STRUCTURE_IN_REGIONS: frozenset[RegionType] = frozenset(
     {"toc", "guide", "cover", "summary"},
 )
 
+_STRUCTURE_SUPPRESS_TYPES: frozenset[SectionType] = frozenset(
+    {"article", "part", "appendix", "legal_reference", "glossary"},
+)
+
+_MIN_APPENDIX_BODY_CHARS = 100
+_MIN_LEGAL_BODY_CHARS = 120
 
 _TOC_LINE = re.compile(r"^[\s\[［【（(]*목\s*차[\s\]］】）)]*$")
 _APPENDIX_PAREN = re.compile(r"^\s*\(\s*별표\s*(\d+)\s*\)\s*(.*)$")
@@ -30,10 +36,89 @@ _APPENDIX_PLAIN = re.compile(r"^\s*별표\s*(\d+)\s+(.+)$")
 _PART = re.compile(r"^\s*(제\s*\d+\s*관)\s+(.+)$")
 _ARTICLE = re.compile(r"^\s*(제\s*\d+\s*조)\s*(.*)$")
 
+_PAGE_POINTER_TAIL = re.compile(
+    r"(?:[\.\．]\s*\d{1,4}\s*|\d{1,4}\s*p\s*)$",
+    re.IGNORECASE,
+)
+_LEGAL_GUIDE_POINTER = re.compile(
+    r"^\s*관련법규\s*\d+\s*p?\s*$",
+    re.IGNORECASE,
+)
+
 
 def _strip_heading_title(raw: str) -> str:
     t = raw.strip()
     return t if len(t) <= 500 else t[:497] + "..."
+
+
+def _legal_heading_line(s: str) -> bool:
+    """True only for standalone legal-index headings (not guide pointers like '관련법규 168p')."""
+    t = s.strip()
+    if not t:
+        return False
+    if _LEGAL_GUIDE_POINTER.match(t):
+        return False
+    if re.match(r"^\s*관련법규\s*\d", t):
+        return False
+    if re.match(r"^\s*약관에서\s*인용(?:한|된)\s*법", t):
+        return True
+    if re.match(r"^\s*관련\s*법규\s*$", t) or re.match(r"^\s*관련\s*법규\s*[:\：]", t):
+        return True
+    return False
+
+
+def _appendix_paren_line_is_page_pointer(line: str) -> bool:
+    """TOC-style appendix row: heading ends with dot/page number on the same line."""
+    s = line.strip()
+    if not _APPENDIX_PAREN.match(line):
+        return False
+    if len(s) <= 120 and _PAGE_POINTER_TAIL.search(s):
+        return True
+    return False
+
+
+def _appendix_plain_line_is_page_pointer(line: str) -> bool:
+    s = line.strip()
+    if not _APPENDIX_PLAIN.match(line):
+        return False
+    if len(s) <= 120 and _PAGE_POINTER_TAIL.search(s):
+        return True
+    return False
+
+
+def _non_pointer_tail_chars(text: str) -> int:
+    """Rough count of substantive characters after dropping page-number-only lines."""
+    kept: list[str] = []
+    for raw in text.splitlines():
+        ln = raw.strip()
+        if not ln:
+            continue
+        if re.fullmatch(r"[\.\．]\s*\d{1,4}", ln):
+            continue
+        if re.fullmatch(r"\d{1,4}\s*p?", ln, flags=re.IGNORECASE):
+            continue
+        kept.append(ln)
+    return sum(len(x) for x in kept)
+
+
+def _appendix_slice_has_substantive_body(full_text: str, start: int, end_exclusive: int) -> bool:
+    chunk = full_text[start:end_exclusive]
+    lines = chunk.splitlines()
+    if not lines:
+        return False
+    tail = "\n".join(lines[1:]).strip()
+    if _non_pointer_tail_chars(tail) >= _MIN_APPENDIX_BODY_CHARS:
+        return True
+    return False
+
+
+def _legal_slice_has_substantive_body(full_text: str, start: int, end_exclusive: int) -> bool:
+    chunk = full_text[start:end_exclusive]
+    lines = chunk.splitlines()
+    if not lines:
+        return False
+    tail = "\n".join(lines[1:]).strip()
+    return _non_pointer_tail_chars(tail) >= _MIN_LEGAL_BODY_CHARS
 
 
 def _classify_line(line: str) -> tuple[SectionType, str, str] | None:
@@ -50,6 +135,8 @@ def _classify_line(line: str) -> tuple[SectionType, str, str] | None:
 
     m_ap = _APPENDIX_PAREN.match(line)
     if m_ap:
+        if _appendix_paren_line_is_page_pointer(line):
+            return None
         rest = (m_ap.group(2) or "").strip()
         title = f"( 별표 {m_ap.group(1)} ) {rest}".strip()
         return (
@@ -60,6 +147,8 @@ def _classify_line(line: str) -> tuple[SectionType, str, str] | None:
 
     m_ap2 = _APPENDIX_PLAIN.match(line)
     if m_ap2:
+        if _appendix_plain_line_is_page_pointer(line):
+            return None
         rest = (m_ap2.group(2) or "").strip()
         title = f"별표 {m_ap2.group(1)} {rest}".strip()
         return "appendix", _strip_heading_title(title), "pattern:appendix_plain"
@@ -77,7 +166,7 @@ def _classify_line(line: str) -> tuple[SectionType, str, str] | None:
         title = re.sub(r"\s+", " ", title)
         return "article", _strip_heading_title(title), "pattern:article_line"
 
-    if "약관에서 인용한" in s and "규정" in s:
+    if _legal_heading_line(s):
         return "legal_reference", _strip_heading_title(s), "pattern:legal_reference_heading"
 
     if s.startswith("보험용어 해설"):
@@ -175,31 +264,43 @@ def _regions_by_page(regions: list[PageRegion]) -> dict[int, PageRegion]:
     return {r.page_number: r for r in regions}
 
 
+def _explicit_front_matter_heading(candidate: SectionCandidate) -> bool:
+    """Keep 목차 / 고객권리안내문 anchors on front-matter pages."""
+    ev = candidate.evidence
+    return any(x.startswith("pattern:toc_heading") for x in ev) or any(
+        x.startswith("pattern:customer_rights_heading") for x in ev
+    )
+
+
 def _should_emit_candidate(
     candidate: SectionCandidate,
     region: PageRegion | None,
 ) -> tuple[bool, list[str]]:
-    """Drop noisy structure headings on cover/toc/guide/summary pages."""
+    """Suppress structural headings on cover/toc/guide/summary; keep coarse toc/guide anchors."""
     trace: list[str] = [f"candidate_rule_confidence:{candidate.confidence:.4f}"]
     if region is not None:
         trace.append(f"page_region:{region.region_type}")
         trace.append(f"page_region_confidence:{region.confidence:.4f}")
         trace.extend(f"region_evidence:{e}" for e in region.evidence)
 
-    if candidate.section_type not in ("part", "article"):
-        trace.append("filter:structure_heading_not_suppressed")
-        return True, trace
-
     if region is None:
         trace.append("filter:missing_region_default_keep")
         return True, trace
 
-    if region.region_type in _SUPPRESS_STRUCTURE_IN_REGIONS:
-        trace.append(f"filter:suppress_structure_in_region:{region.region_type}")
+    if region.region_type not in _SUPPRESS_STRUCTURE_IN_REGIONS:
+        trace.append("filter:not_front_matter_region_keep")
+        return True, trace
+
+    if candidate.section_type in _STRUCTURE_SUPPRESS_TYPES:
+        trace.append(f"filter:suppress_structure_on_front_matter:{region.region_type}")
         return False, trace
 
-    trace.append("filter:structure_heading_keep")
-    return True, trace
+    if candidate.section_type in ("toc", "guide") and _explicit_front_matter_heading(candidate):
+        trace.append("filter:keep_explicit_toc_guide_heading")
+        return True, trace
+
+    trace.append("filter:suppress_non_structural_on_front_matter")
+    return False, trace
 
 
 def _assembly_confidence(
@@ -238,9 +339,31 @@ def assemble_document_sections(
     by_page = _regions_by_page(page_regions)
 
     accepted: list[tuple[SectionCandidate, list[str], float]] = []
-    for c in candidates:
+    sorted_cands = sorted(
+        candidates,
+        key=lambda c: (c.start_char_offset, c.start_page, c.title, c.section_type),
+    )
+    next_offset_by_index: dict[int, int] = {}
+    for i, _c in enumerate(sorted_cands):
+        next_offset_by_index[i] = (
+            sorted_cands[i + 1].start_char_offset if i + 1 < len(sorted_cands) else total_len
+        )
+
+    for i, c in enumerate(sorted_cands):
         region = by_page.get(c.start_page)
         emit, trace = _should_emit_candidate(c, region)
+        next_start = next_offset_by_index[i]
+
+        if emit and c.section_type == "appendix":
+            if not _appendix_slice_has_substantive_body(full_text, c.start_char_offset, next_start):
+                trace = trace + ["filter:appendix_insufficient_substantive_body"]
+                emit = False
+
+        if emit and c.section_type == "legal_reference":
+            if not _legal_slice_has_substantive_body(full_text, c.start_char_offset, next_start):
+                trace = trace + ["filter:legal_reference_insufficient_substantive_body"]
+                emit = False
+
         conf = _assembly_confidence(c, region, emit=emit)
         if emit:
             accepted.append((c, trace, conf))

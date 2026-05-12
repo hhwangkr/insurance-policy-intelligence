@@ -7,6 +7,31 @@ from insurance_ai_shared.models.document import Document
 from insurance_ai_shared.models.section import PageRegion, RegionType
 
 
+def _appendix_heading_line_count(text: str) -> tuple[int, list[str]]:
+    """Count appendix/table heading lines (not inline 별표 mentions inside clauses)."""
+    evidence: list[str] = []
+    n = 0
+    for line in text.splitlines():
+        if re.match(r"^\s*[\(（]\s*별표\s*\d+\s*[\)）]", line):
+            n += 1
+            evidence.append("heading_line:byeolpyo_paren")
+        elif re.match(r"^\s*별표\s+\d+\s+\S", line):
+            n += 1
+            evidence.append("heading_line:byeolpyo_plain")
+    return n, evidence
+
+
+def _legal_heading_present(text: str) -> bool:
+    """Boost legal_reference region only when a real legal-index heading appears."""
+    for line in text.splitlines():
+        s = line.strip()
+        if re.match(r"^\s*약관에서\s*인용(?:한|된)\s*법", s):
+            return True
+        if re.match(r"^\s*관련\s*법규\s*$", s) or re.match(r"^\s*관련\s*법규\s*[:\：]", s):
+            return True
+    return False
+
+
 def _score_region(page_number: int, text: str) -> tuple[RegionType, float, list[str]]:
     """Deterministic page-level region label from shallow text signals."""
     evidence: list[str] = []
@@ -34,9 +59,9 @@ def _score_region(page_number: int, text: str) -> tuple[RegionType, float, list[
         scores["guide"] += 85.0
         evidence.append("keyword:guide_or_customer_rights")
 
-    if "약관에서 인용한" in stripped and "규정" in stripped:
+    if _legal_heading_present(stripped):
         scores["legal_reference"] += 80.0
-        evidence.append("keyword:legal_reference_block")
+        evidence.append("keyword:legal_reference_heading")
 
     if stripped.startswith("보험용어 해설") or ("보험용어" in stripped and "해설" in stripped):
         scores["glossary"] += 78.0
@@ -59,9 +84,10 @@ def _score_region(page_number: int, text: str) -> tuple[RegionType, float, list[
         scores["toc"] += 45.0
         evidence.append(f"signal:many_article_outline_lines:{toc_article_lines}")
 
-    if re.search(r"별표\s*\d+", stripped):
-        scores["appendix"] += 42.0
-        evidence.append("keyword:byeolpyo")
+    apx_heads, apx_evs = _appendix_heading_line_count(stripped)
+    if apx_heads >= 1:
+        scores["appendix"] += min(38.0 + 14.0 * float(apx_heads), 88.0)
+        evidence.extend(apx_evs[:5])
 
     if "요약" in stripped or "알아두세요" in stripped or "주요내용" in stripped:
         scores["summary"] += 48.0
