@@ -1,32 +1,56 @@
 # Data staging (pre-ingestion)
 
-This document describes how **manually collected** public insurance disclosure PDFs move from a
-**repository-local inbox** into committed, normalized storage **before** any PDF parsing or
-ingestion pipeline runs.
+This document describes how **manually collected** public insurance disclosure PDFs are archived,
+normalized, and described in YAML **before** optional PDF-to-JSON ingestion.
 
 ## Goals
 
-- **Repository-local drop zone**: downloads go under `data/inbox/manual/` (transient; only
-  `.gitkeep` is tracked—see root `.gitignore`), not under user-specific folders such as OS Downloads.
-- **Deterministic storage keys**: committed PDFs under `data/raw/manual/` use normalized,
-  hash-based filenames.
-- **Preserve provenance**: `original_filename` in the manifest is the basename of the file as
-  dropped into the inbox; optional URL and notes live in the manifest, not in the on-disk key.
+- **Original source archive**: downloads live under `data/inbox/manual/` using **disclosure-room
+  filenames** as downloaded. These PDFs are **tracked in git** as the human-readable provenance
+  layer (not a transient ignored drop zone).
+- **Normalized staged dataset**: committed PDFs under `data/raw/manual/` use deterministic,
+  hash-based filenames and are the **only** PDF paths referenced by ingestion (`manifest.source_file`).
+- **Preserve lineage in the manifest**: `original_filename` records the inbox basename; `source_file`
+  points at `data/raw/manual/...`; optional URL and notes live in the manifest.
 - **Manifest as source of truth**: semantic fields (insurer, product, document type, dates,
-  splits, language, etc.) live in YAML under `data/manifests/`. The storage filename is a
+  splits, language, etc.) live in YAML under `data/manifests/`. The normalized storage filename is a
   **derived key**, not semantic truth.
+
+## Provenance vs storage tradeoff
+
+Keeping **both** `data/inbox/manual/` (original names) and `data/raw/manual/` (normalized copies)
+means **duplicate PDF bytes** in version control for the same underlying file. This project accepts
+that cost to prioritize:
+
+- **Auditability** — reviewers see filenames as published by the insurer or regulator.
+- **Reproducibility** — ingestion always reads stable keys under `data/raw/manual/` via the manifest.
+
+If minimizing repo size matters more than retaining originals in-tree, you could rely on manifest
+metadata and normalized PDFs only; the default policy here is **track both**.
 
 ## Directory layout
 
 | Path | Purpose |
 |------|---------|
-| `data/inbox/manual/` | **Transient** inbox: place downloads here, then run staging. Not committed (except `.gitkeep`). |
-| `data/raw/manual/` | **Committed** normalized PDFs from staging (reproducible storage keys). |
+| `data/inbox/manual/` | **Tracked** original-source PDFs as downloaded from public disclosure rooms (filenames preserved). |
+| `data/raw/manual/` | **Tracked** normalized, hash-keyed PDFs; **`source_file` in the manifest points here** for ingestion. |
 | `data/raw/crawled/` | Reserved for future crawled assets (not implemented here). |
-| `data/processed/documents/` | **Generated** full canonical JSON per document (`*.json` gitignored; folder tracked via `.gitkeep`). |
-| `data/manifests/` | YAML manifests. `manual.yaml` may be **generated** by `stage_manual_inbox.py`; keep `manual.example.yaml` as a shape reference. |
-| `examples/processed_documents/` | **Tracked** small sample processed JSON demonstrating the ingestion schema (not a full corpus). |
+| `data/processed/documents/` | **Generated** full canonical JSON per document (`*.json` gitignored; folder may use `.gitkeep`). |
+| `data/manifests/` | YAML manifests — lineage and semantics. `manual.yaml` may be **generated** by `stage_manual_inbox.py`; keep `manual.example.yaml` as a shape reference. |
+| `examples/processed_documents/` | **Tracked** small sample processed JSON (portfolio / schema reference; not a full corpus). |
 | `scripts/` | Operational scripts (e.g. manual PDF staging). |
+
+## Manifest fields (lineage and ingestion)
+
+Each document row in `data/manifests/manual.yaml` should preserve at least:
+
+- **`original_filename`** — basename of the file under `data/inbox/manual/` (or equivalent original name).
+- **`source_file`** — repo-relative path under **`data/raw/manual/`** to the normalized PDF bytes used for hash validation and ingestion.
+- **`content_hash`** — SHA-256 (hex) of the **normalized** file at `source_file` (must match on disk).
+- **`collection_method`** — how the PDF entered the repo (e.g. `manual`, `manual_inbox_rules`).
+- **`dataset_split`** — intended split label for experiments (e.g. `train`, `unassigned`).
+
+Downstream **ingestion does not read the inbox path**; it resolves `source_file` under `data/raw/manual/` only.
 
 ## Storage filename convention
 
@@ -65,19 +89,19 @@ from normalized filename segments plus the content hash.
    **`data/raw/manual/`** with the normalized filename, and prints a **single manifest document**
    YAML snippet to stdout. The snippet uses **only repo-relative** `source_file`
    (`data/raw/manual/...`), `original_filename` (basename only), `content_hash`, and
-   `collection_method: manual`.
+   `collection_method` / `dataset_split` as provided on the CLI.
 5. Paste or merge the snippet into a manifest under `data/manifests/`, then fill `source_url`,
    `tags`, `notes`, etc. as needed.
-6. Commit **`data/raw/manual/`** and the manifest. Remove the inbox copy when satisfied (inbox
-   stays uncommitted).
+6. Commit **`data/inbox/manual/`** (originals), **`data/raw/manual/`** (normalized copies), and
+   **`data/manifests/manual.yaml`** so provenance and ingestion inputs stay reproducible.
 
 ## Staging workflow (short)
 
 1. Copy PDFs into `data/inbox/manual/`.
 2. From the repo root, run the staging script with a **repo-relative** `--source` (see example
    below).
-3. Verify `data/raw/manual/` and the printed manifest fields, then delete the inbox copy if
-   desired.
+3. Verify `data/raw/manual/` and the printed manifest fields, then commit inbox originals,
+   normalized PDFs, and the manifest together when satisfied.
 
 Example (run from repository root):
 
@@ -146,10 +170,15 @@ Fully manual, single-file staging (explicit CLI metadata) remains available via
 
 ## Processed JSON (ingestion)
 
-After staging, **committed inputs** for the ingestion pipeline are:
+Committed **source data** for reproducibility:
 
-- `data/raw/manual/*.pdf` — normalized PDF bytes (reproducible keys)
-- `data/manifests/manual.yaml` — semantic metadata and `source_file` / `content_hash` pointers
+- `data/inbox/manual/*.pdf` — original disclosure filenames (archive).
+- `data/raw/manual/*.pdf` — normalized bytes referenced by `manifest.source_file`.
+- `data/manifests/manual.yaml` — lineage (`original_filename`, `source_file`, `content_hash`,
+  `collection_method`, `dataset_split`, etc.).
+
+**Ingestion** reads PDFs only via **`source_file` under `data/raw/manual/`** (plus hash checks), not
+via inbox paths.
 
 **Processed outputs** under `data/processed/documents/` are **generated locally** (page-level text and
 canonical `Document` JSON). **`*.json` files there are gitignored** so large artifacts do not churn

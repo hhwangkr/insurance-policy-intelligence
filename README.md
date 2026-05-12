@@ -68,10 +68,10 @@ packages/
   shared/         # Shared models/types
 
 data/
-  inbox/manual/   # transient PDF drop zone (see docs/data-staging.md)
-  raw/            # committed normalized PDFs (manual/ and crawled/)
-  processed/      # generated full JSON per document (gitignored; see docs/data-staging.md)
-  manifests/      # YAML manifest drafts
+  inbox/manual/   # tracked original disclosure-room PDFs (filenames preserved; see docs/data-staging.md)
+  raw/manual/     # tracked normalized, hash-keyed PDFs (ingestion reads manifest source_file here)
+  processed/      # generated full JSON per document (*.json gitignored; see docs/data-staging.md)
+  manifests/      # YAML manifest — lineage between originals and normalized paths
 
 examples/
   processed_documents/   # curated sample processed JSON (schema reference)
@@ -161,14 +161,23 @@ pytest
 
 ## Data artifacts
 
-Reproducibility and review-friendly diffs:
+This repo keeps a **reproducible paper trail** for public disclosure PDFs:
 
-- **Tracked:** `data/raw/manual/*.pdf` (normalized PDFs) and `data/manifests/manual.yaml`
-  (metadata and content-hash pointers).
-- **Generated locally, not tracked:** full processed JSON files under `data/processed/documents/`
-  (`*.json` is gitignored; the directory may contain a `.gitkeep`).
-- **Tracked schema sample:** `examples/processed_documents/sample_document.json` — small excerpt of
-  real ingestion output (first pages only) for portfolio and contract reference.
+| Layer | Path | Role |
+|-------|------|------|
+| Original archive | `data/inbox/manual/*.pdf` | **Tracked** downloads using disclosure-room filenames (human-readable provenance). |
+| Normalized staged PDFs | `data/raw/manual/*.pdf` | **Tracked** hash-based keys used as ingestion inputs (`manifest.source_file`). |
+| Lineage + semantics | `data/manifests/manual.yaml` | **Tracked** mapping between `original_filename`, normalized `source_file`, `content_hash`, and labels. |
+| Generated outputs | `data/processed/documents/*.json` | **Not tracked** (large, noisy); regenerate locally. |
+| Portfolio sample | `examples/processed_documents/` | **Tracked** small schema exemplar. |
+
+**Tradeoff:** storing both inbox originals and normalized copies **duplicates bytes** in git for the
+same underlying PDF content. The benefit is **clear provenance** (original filenames and disclosure
+context) plus **deterministic ingestion keys** (`data/raw/manual/...`) decoupled from arbitrary
+download names.
+
+**Ingestion inputs:** the pipeline resolves PDF paths from the manifest only — `source_file` must
+point under **`data/raw/manual/`** (not the inbox). See `docs/data-staging.md`.
 
 Regenerate full processed JSON locally:
 

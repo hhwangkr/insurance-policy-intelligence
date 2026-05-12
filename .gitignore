@@ -38,6 +38,5 @@ build/
 *.egg-info/
 *.egg
 
-
-# Full processed document JSON outputs (curated schema sample under examples/processed_documents/)
+# Full processed document JSON outputs (curated samples live under examples/processed_documents/)
 data/processed/documents/*.json

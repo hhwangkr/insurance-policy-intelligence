@@ -16,4 +16,6 @@ uv run python -m insurance_ai_ingestion.ingest_manifest \
   --output-dir data/processed/documents
 ```
 
-Committed inputs remain **`data/raw/manual/*.pdf`** and **`data/manifests/manual.yaml`**.
+Committed source inputs are **`data/inbox/manual/*.pdf`** (originals), **`data/raw/manual/*.pdf`**
+(normalized ingestion inputs), and **`data/manifests/manual.yaml`** (lineage and metadata). See
+`docs/data-staging.md`.
