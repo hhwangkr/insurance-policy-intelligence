@@ -31,8 +31,8 @@ dev = [
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
 asyncio_default_fixture_loop_scope = "function"
-testpaths = ["apps/api/tests"]
-pythonpath = ["apps/api/src"]
+testpaths = ["apps/api/tests", "scripts/tests"]
+pythonpath = ["apps/api/src", "scripts"]
 
 [tool.ruff]
 target-version = "py312"
@@ -44,6 +44,7 @@ src = [
     "packages/agents/src",
     "packages/retrieval/src",
     "packages/ingestion/src",
+    "scripts",
 ]
 
 [tool.ruff.lint]
@@ -52,6 +53,7 @@ ignore = []
 
 [tool.ruff.lint.per-file-ignores]
 "**/tests/**" = ["S101"]
+"scripts/tests/**" = ["S101"]
 "**/config/settings.py" = ["S104"]
 
 [tool.mypy]
@@ -66,6 +68,8 @@ files = [
     "packages/agents/src",
     "packages/retrieval/src",
     "packages/ingestion/src",
+    "scripts/staging_lib.py",
+    "scripts/stage_manual_pdf.py",
 ]
 mypy_path = [
     "apps/api/src",
@@ -74,6 +78,7 @@ mypy_path = [
     "packages/agents/src",
     "packages/retrieval/src",
     "packages/ingestion/src",
+    "scripts",
 ]
 explicit_package_bases = true
 

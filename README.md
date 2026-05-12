@@ -67,7 +67,15 @@ packages/
   evaluation/     # Evaluation pipelines
   shared/         # Shared models/types
 
+data/
+  raw/            # staged PDFs (manual/ and crawled/)
+  processed/      # reserved for processed artifacts
+  manifests/      # YAML manifest drafts
+
+scripts/          # operational helpers (see docs/data-staging.md)
+
 docs/
+  data-staging.md   # Manual PDF staging and manifest conventions
 infra/
 ```
 

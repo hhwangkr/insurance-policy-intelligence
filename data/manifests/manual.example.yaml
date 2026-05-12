@@ -1,0 +1,21 @@
+# Example manifest draft for manually staged public policy PDFs.
+# Merge documents from script output into `documents` as your library grows.
+
+documents:
+  - document_id: example_mutual_auto_sample_auto_policy_2024-01-15_a1b2c3d4
+    insurer: "Example Mutual"
+    product_name: "Sample Auto Policy"
+    product_type: auto
+    product_slug: sample_auto
+    document_type: policy
+    effective_date: "2024-01-15"
+    source_file: data/raw/manual/example_mutual_auto_sample_auto_policy_2024-01-15_a1b2c3d4.pdf
+    original_filename: PolicyBook.pdf
+    source_url: ""
+    content_hash: "0000000000000000000000000000000000000000000000000000000000000000"
+    collection_method: manual
+    dataset_split: train
+    language: ""
+    collected_at: "2024-01-15T12:00:00+00:00"
+    tags: []
+    notes: ""
