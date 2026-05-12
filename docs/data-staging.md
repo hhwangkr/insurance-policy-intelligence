@@ -196,6 +196,21 @@ uv run python -m insurance_ai_ingestion.ingest_manifest \
   --output-dir data/processed/documents
 ```
 
+## Ingestion quality inspection
+
+After generating `data/processed/documents/*.json`, summarize extraction health before chunking or
+sectioning:
+
+```bash
+uv run python -m insurance_ai_ingestion.inspect_documents \
+  --input-dir data/processed/documents \
+  --report-path data/processed/reports/ingestion_quality.md
+```
+
+Console output is always printed; `--report-path` is optional. Markdown reports under
+`data/processed/reports/` are **local artifacts** (gitignored `*.md`; directory kept via
+`.gitkeep`). Regenerate whenever ingestion outputs change.
+
 ## Related files
 
 - `examples/processed_documents/sample_document.json` — curated ingestion output sample (schema reference).

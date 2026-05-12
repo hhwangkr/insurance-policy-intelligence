@@ -40,3 +40,6 @@ build/
 
 # Full processed document JSON outputs (curated samples live under examples/processed_documents/)
 data/processed/documents/*.json
+
+# Generated ingestion quality reports (optional markdown output from inspect_documents)
+data/processed/reports/*.md

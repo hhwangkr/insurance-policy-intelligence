@@ -187,6 +187,17 @@ uv run python -m insurance_ai_ingestion.ingest_manifest \
   --output-dir data/processed/documents
 ```
 
+Summarize ingestion quality (page emptiness, low-text pages, aggregates) from generated JSON:
+
+```bash
+uv run python -m insurance_ai_ingestion.inspect_documents \
+  --input-dir data/processed/documents \
+  --report-path data/processed/reports/ingestion_quality.md
+```
+
+Omit `--report-path` for console-only output. Markdown reports under `data/processed/reports/` are
+generated locally and gitignored.
+
 See also `docs/data-staging.md` and `examples/processed_documents/README.md`.
 
 ---
