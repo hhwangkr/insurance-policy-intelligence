@@ -1,0 +1,161 @@
+---
+description: Insurance AI engineering rules
+globs:
+  - "**/*.py"
+alwaysApply: true
+---
+
+# Insurance AI Project Rules
+
+## General Principles
+
+- Prioritize maintainability over shortcuts.
+- Prefer explicitness over hidden abstractions.
+- Keep architecture modular and composable.
+- Optimize for production readiness.
+- Avoid tightly coupled code.
+
+---
+
+# Python Rules
+
+- Use Python 3.12+
+- Use type hints everywhere.
+- Use Pydantic v2 models for structured data.
+- Avoid raw dictionaries whenever possible.
+- Prefer dataclasses or typed models.
+- Prefer async-first patterns.
+- Keep functions focused and small.
+- Avoid giant files.
+
+---
+
+# FastAPI Rules
+
+- Keep API routers thin.
+- Do not place business logic inside routers.
+- Use dependency injection explicitly.
+- Separate routers, services, and repositories.
+- Use async endpoints.
+
+---
+
+# AI System Rules
+
+- All LLM outputs must use structured outputs.
+- Validate model outputs before returning them.
+- Never expose raw model responses directly.
+- Keep prompts in dedicated prompt files.
+- Separate retrieval, reranking, and reasoning layers.
+- Agent state transitions must be explicit.
+- Avoid hidden prompt chains.
+
+---
+
+# RAG Rules
+
+- Use hybrid retrieval patterns.
+- Preserve metadata and document hierarchy.
+- Support citation-level grounding.
+- Retrieval quality is more important than stylistic generation.
+
+---
+
+# Logging and Observability
+
+- Use structured logging.
+- Add tracing hooks to major workflows.
+- Log important agent transitions.
+- Avoid silent failures.
+
+---
+
+# Testing Rules
+
+- Business logic must be independently testable.
+- Add unit tests for critical workflows.
+- Avoid tightly coupling tests to implementation details.
+
+---
+
+# Code Organization
+
+Use the following monorepo structure:
+
+- apps/api/
+  - FastAPI backend application
+  - API routers
+  - app configuration
+  - dependency injection
+  - application startup/shutdown logic
+
+- apps/web/
+  - Next.js frontend application
+  - user interface
+  - citation display
+  - workflow visualization
+
+- packages/agents/
+  - LangGraph workflows
+  - agent state definitions
+  - agent nodes and transitions
+
+- packages/retrieval/
+  - document chunking
+  - embedding
+  - vector search
+  - BM25 search
+  - hybrid retrieval
+  - reranking
+
+- packages/ingestion/
+  - PDF parsing
+  - document loading
+  - document normalization
+  - metadata extraction
+
+- packages/evaluation/
+  - retrieval evaluation
+  - citation evaluation
+  - hallucination evaluation
+  - benchmark datasets
+
+- packages/shared/
+  - shared Pydantic models
+  - shared types
+  - constants
+  - common utilities
+
+- docs/
+  - architecture notes
+  - retrieval strategy
+  - agent design
+  - evaluation design
+
+- infra/
+  - Docker files
+  - docker-compose
+  - local infrastructure configuration
+
+Avoid creating top-level folders such as:
+
+- routers/
+- services/
+- repositories/
+- agents/
+- retrieval/
+- prompts/
+- evaluation/
+- shared/
+
+unless they are inside the appropriate app or package.
+
+---
+
+# Frontend Rules
+
+- Keep UI minimal and functional.
+- Prioritize clarity over visual complexity.
+- Display citations clearly.
+- Surface reasoning traces where useful.
+```

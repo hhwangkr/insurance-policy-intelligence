@@ -1,0 +1,13 @@
+[project]
+name = "insurance-ai-shared"
+version = "0.1.0"
+description = "Shared typed models and constants for insurance policy intelligence services."
+requires-python = ">=3.12"
+dependencies = ["pydantic>=2.10"]
+
+[build-system]
+requires = ["setuptools>=75", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+where = ["src"]

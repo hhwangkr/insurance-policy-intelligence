@@ -1,0 +1,81 @@
+[project]
+name = "insurance-policy-intelligence"
+version = "0.1.0"
+description = "Monorepo workspace root for the insurance policy intelligence platform."
+requires-python = ">=3.12"
+
+[tool.uv]
+managed = true
+
+[tool.uv.workspace]
+members = [
+    "apps/api",
+    "packages/shared",
+    "packages/evaluation",
+    "packages/agents",
+    "packages/retrieval",
+    "packages/ingestion",
+]
+
+[dependency-groups]
+dev = [
+    "httpx>=0.28",
+    "mypy>=1.13",
+    "pre-commit>=4.0",
+    "pytest>=8.3",
+    "pytest-asyncio>=0.25",
+    "ruff>=0.8",
+]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+asyncio_default_fixture_loop_scope = "function"
+testpaths = ["apps/api/tests"]
+pythonpath = ["apps/api/src"]
+
+[tool.ruff]
+target-version = "py312"
+line-length = 100
+src = [
+    "apps/api/src",
+    "packages/shared/src",
+    "packages/evaluation/src",
+    "packages/agents/src",
+    "packages/retrieval/src",
+    "packages/ingestion/src",
+]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "UP", "ASYNC", "S"]
+ignore = []
+
+[tool.ruff.lint.per-file-ignores]
+"**/tests/**" = ["S101"]
+"**/config/settings.py" = ["S104"]
+
+[tool.mypy]
+python_version = "3.12"
+strict = true
+warn_unreachable = true
+show_error_codes = true
+files = [
+    "apps/api/src",
+    "packages/shared/src",
+    "packages/evaluation/src",
+    "packages/agents/src",
+    "packages/retrieval/src",
+    "packages/ingestion/src",
+]
+mypy_path = [
+    "apps/api/src",
+    "packages/shared/src",
+    "packages/evaluation/src",
+    "packages/agents/src",
+    "packages/retrieval/src",
+    "packages/ingestion/src",
+]
+explicit_package_bases = true
+
+[[tool.mypy.overrides]]
+module = ["opentelemetry.*", "opentelemetry_exporter.*", "opentelemetry_instrumentation.*"]
+ignore_missing_imports = true

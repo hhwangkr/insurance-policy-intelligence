@@ -1,0 +1,13 @@
+[project]
+name = "insurance-ai-retrieval"
+version = "0.1.0"
+description = "Hybrid retrieval and reranking (reserved)."
+requires-python = ">=3.12"
+dependencies = []
+
+[build-system]
+requires = ["setuptools>=75", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+where = ["src"]

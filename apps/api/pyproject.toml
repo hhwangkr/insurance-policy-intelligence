@@ -1,0 +1,29 @@
+[project]
+name = "insurance-ai-api"
+version = "0.1.0"
+description = "FastAPI service for the insurance policy intelligence platform."
+requires-python = ">=3.12"
+dependencies = [
+    "fastapi>=0.115",
+    "uvicorn[standard]>=0.32",
+    "pydantic-settings>=2.7",
+    "structlog>=24.4",
+    "insurance-ai-shared",
+    "opentelemetry-api>=1.28",
+    "opentelemetry-sdk>=1.28",
+    "opentelemetry-exporter-otlp-proto-http>=1.28",
+    "opentelemetry-instrumentation-fastapi>=0.49b0",
+]
+
+[project.scripts]
+insurance-ai-api = "insurance_ai_api.__main__:main"
+
+[build-system]
+requires = ["setuptools>=75", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.uv.sources]
+insurance-ai-shared = { workspace = true }
