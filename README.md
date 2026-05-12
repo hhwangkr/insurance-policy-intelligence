@@ -70,8 +70,11 @@ packages/
 data/
   inbox/manual/   # transient PDF drop zone (see docs/data-staging.md)
   raw/            # committed normalized PDFs (manual/ and crawled/)
-  processed/      # reserved for processed artifacts
+  processed/      # generated full JSON per document (gitignored; see docs/data-staging.md)
   manifests/      # YAML manifest drafts
+
+examples/
+  processed_documents/   # curated sample processed JSON (schema reference)
 
 scripts/          # operational helpers (see docs/data-staging.md)
                   #   stage_manual_pdf.py   — single-file manual staging (explicit CLI)
@@ -153,6 +156,29 @@ Run tests:
 ```bash
 pytest
 ```
+
+---
+
+## Data artifacts
+
+Reproducibility and review-friendly diffs:
+
+- **Tracked:** `data/raw/manual/*.pdf` (normalized PDFs) and `data/manifests/manual.yaml`
+  (metadata and content-hash pointers).
+- **Generated locally, not tracked:** full processed JSON files under `data/processed/documents/`
+  (`*.json` is gitignored; the directory may contain a `.gitkeep`).
+- **Tracked schema sample:** `examples/processed_documents/sample_document.json` — small excerpt of
+  real ingestion output (first pages only) for portfolio and contract reference.
+
+Regenerate full processed JSON locally:
+
+```bash
+uv run python -m insurance_ai_ingestion.ingest_manifest \
+  --manifest data/manifests/manual.yaml \
+  --output-dir data/processed/documents
+```
+
+See also `docs/data-staging.md` and `examples/processed_documents/README.md`.
 
 ---
 

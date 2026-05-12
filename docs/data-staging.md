@@ -23,8 +23,9 @@ ingestion pipeline runs.
 | `data/inbox/manual/` | **Transient** inbox: place downloads here, then run staging. Not committed (except `.gitkeep`). |
 | `data/raw/manual/` | **Committed** normalized PDFs from staging (reproducible storage keys). |
 | `data/raw/crawled/` | Reserved for future crawled assets (not implemented here). |
-| `data/processed/` | Reserved for future processed artifacts (not implemented here). |
+| `data/processed/documents/` | **Generated** full canonical JSON per document (`*.json` gitignored; folder tracked via `.gitkeep`). |
 | `data/manifests/` | YAML manifests. `manual.yaml` may be **generated** by `stage_manual_inbox.py`; keep `manual.example.yaml` as a shape reference. |
+| `examples/processed_documents/` | **Tracked** small sample processed JSON demonstrating the ingestion schema (not a full corpus). |
 | `scripts/` | Operational scripts (e.g. manual PDF staging). |
 
 ## Storage filename convention
@@ -143,8 +144,32 @@ uv run python scripts/stage_manual_inbox.py --max-pages 3
 Fully manual, single-file staging (explicit CLI metadata) remains available via
 `scripts/stage_manual_pdf.py`.
 
+## Processed JSON (ingestion)
+
+After staging, **committed inputs** for the ingestion pipeline are:
+
+- `data/raw/manual/*.pdf` — normalized PDF bytes (reproducible keys)
+- `data/manifests/manual.yaml` — semantic metadata and `source_file` / `content_hash` pointers
+
+**Processed outputs** under `data/processed/documents/` are **generated locally** (page-level text and
+canonical `Document` JSON). **`*.json` files there are gitignored** so large artifacts do not churn
+in pull requests. The directory remains in the tree via `data/processed/documents/.gitkeep`.
+
+For a **small tracked reference** of the same schema (first few pages of one manifest PDF, fixed
+`created_at`), see `examples/processed_documents/sample_document.json` and
+`examples/processed_documents/README.md`.
+
+Regenerate **full** outputs for every manifest row anytime:
+
+```bash
+uv run python -m insurance_ai_ingestion.ingest_manifest \
+  --manifest data/manifests/manual.yaml \
+  --output-dir data/processed/documents
+```
+
 ## Related files
 
+- `examples/processed_documents/sample_document.json` — curated ingestion output sample (schema reference).
 - `data/manifests/manual.example.yaml` — illustrative manifest shape (hand-authored).
 - `scripts/staging_lib.py` — hash, path resolution, filename helpers (unit-tested).
 - `scripts/metadata_models.py` — Pydantic models for manifest rows and per-field inference.

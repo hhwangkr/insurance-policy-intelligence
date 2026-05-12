@@ -38,6 +38,6 @@ build/
 *.egg-info/
 *.egg
 
-# Transient manual PDF inbox (keep .gitkeep only)
-data/inbox/manual/*
-!data/inbox/manual/.gitkeep
+
+# Full processed document JSON outputs (curated schema sample under examples/processed_documents/)
+data/processed/documents/*.json

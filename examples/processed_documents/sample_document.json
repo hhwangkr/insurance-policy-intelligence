@@ -1,0 +1,47 @@
+{
+  "document_id": "samsunglife_whole_life_balance_whole_life_insurance_policy_terms_20260301_1699395d",
+  "metadata": {
+    "document_id": "samsunglife_whole_life_balance_whole_life_insurance_policy_terms_20260301_1699395d",
+    "insurer": "samsunglife",
+    "product_name": "밸런스종신보험(2603)(무배당,보증비용부과형)",
+    "product_type": "whole_life",
+    "product_slug": "balance_whole_life_insurance",
+    "document_type": "policy_terms",
+    "effective_date": "2026-03-01",
+    "source_file": "data/raw/manual/samsunglife_whole_life_balance_whole_life_insurance_policy_terms_20260301_1699395d.pdf",
+    "original_filename": "1774507888225.pdf",
+    "source_url": "",
+    "content_hash": "1699395d64c0073a48573dbd8395b01f4eb5889bdf400777e8a9f9186ab029d8",
+    "collection_method": "manual_inbox_rules",
+    "dataset_split": "unassigned",
+    "language": "ko",
+    "tags": [],
+    "notes": "rule_extract_needs_review:dataset_split,effective_date,language"
+  },
+  "pages": [
+    {
+      "document_id": "samsunglife_whole_life_balance_whole_life_insurance_policy_terms_20260301_1699395d",
+      "page_number": 1,
+      "text": "보험약관\n본 상품은 보장성보험으로 은행의 예ㆍ적금과는 다른 상품이고, 저축(연금) 목적에는 적합하지 않습니다.\n※ 이 약관은 금융소비자보호에 관한 법률 등 관계법령 및 금융소비자보호 내부통제기준에 따른 절차를 거쳐 제공됩니다.\n삼성\n밸런스종신보험(2603)(무배당,보증비용부과형) \n[저해약환급금형]\n",
+      "char_count": 168,
+      "extraction_method": "pymupdf"
+    },
+    {
+      "document_id": "samsunglife_whole_life_balance_whole_life_insurance_policy_terms_20260301_1699395d",
+      "page_number": 2,
+      "text": "진심으로 깊은 감사의 말씀을 드립니다.\n삼성생명은 「보험은 사랑」이라는 컨셉 아래\n고객의 사랑이 평생 이어지도록 든든한 힘이 되고자 \n최선을 다하고 있습니다.\n오늘의 삼성생명이 있기까지 한결같이 성원해 주신\n고객 여러분에게 다시 한번 깊이 감사드리며,\n언제 어디서나 고객이 있는 곳에는 \n삼성생명이 함께 하는 고객 여러분의\n‘신뢰받는 삶의 동반자’가 될 수 있도록\n더욱 노력할 것을 약속드립니다.\n앞으로도 애정 어린 관심과 성원을 부탁드리며\n고객님의 가정에 사랑과 행복이 가득하시기를 \n기원합니다.\n",
+      "char_count": 279,
+      "extraction_method": "pymupdf"
+    },
+    {
+      "document_id": "samsunglife_whole_life_balance_whole_life_insurance_policy_terms_20260301_1699395d",
+      "page_number": 3,
+      "text": " \n약관을 쉽게 이용할 수 있는 \n약관 이용가이드 북 \n",
+      "char_count": 31,
+      "extraction_method": "pymupdf"
+    }
+  ],
+  "page_count": 3,
+  "total_char_count": 478,
+  "created_at": "2026-05-12T12:00:00Z"
+}
