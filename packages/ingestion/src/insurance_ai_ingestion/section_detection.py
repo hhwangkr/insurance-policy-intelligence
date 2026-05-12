@@ -28,8 +28,27 @@ _STRUCTURE_SUPPRESS_TYPES: frozenset[SectionType] = frozenset(
 )
 
 _MIN_APPENDIX_BODY_CHARS = 100
-_MIN_LEGAL_BODY_CHARS = 120
 _MIN_TOCLIKE_TAIL_SUBSTANTIVE_CHARS = 35
+
+_LEGAL_CORPUS_HINTS: tuple[str, ...] = (
+    "민법",
+    "상법",
+    "보험업법",
+    "금융소비자보호법",
+    "조세특례제한법",
+    "소비자기본법",
+    "개인정보 보호법",
+    "전자금융거래법",
+    "보험업법 시행령",
+    "약관의 규제에 관한 법률",
+)
+
+_LEGAL_GUIDE_BLOCK_PHRASES: tuple[str, ...] = (
+    "보험약관 가이드",
+    "보험약관 요약서",
+    "약관을 쉽게 이용",
+    "관련법규 168p",
+)
 
 _TOC_LINE = re.compile(r"^[\s\[［【（(]*목\s*차[\s\]］】）)]*$")
 _APPENDIX_PAREN = re.compile(r"^\s*\(\s*별표\s*(\d+)\s*\)\s*(.*)$")
@@ -132,13 +151,58 @@ def _appendix_slice_has_substantive_body(full_text: str, start: int, end_exclusi
     return False
 
 
-def _legal_slice_has_substantive_body(full_text: str, start: int, end_exclusive: int) -> bool:
-    chunk = full_text[start:end_exclusive]
+def _legal_chunk_has_substantive_law_content(chunk: str) -> bool:
+    """True when text after the heading looks like law citations, not guide/TOC filler."""
     lines = chunk.splitlines()
-    if not lines:
+    if len(lines) < 2:
         return False
-    tail = "\n".join(lines[1:]).strip()
-    return _non_pointer_tail_chars(tail) >= _MIN_LEGAL_BODY_CHARS
+    body = "\n".join(lines[1:]).strip()
+    if len(body) < 40:
+        return False
+    if any(hint in body for hint in _LEGAL_CORPUS_HINTS):
+        return True
+    if re.search(r"[「【][^」』\n]{2,80}[」』]", body):
+        return True
+    if re.search(
+        r"제\s*\d+\s*조\s*[（(]?\s*(?:민법|상법|보험업법|금융소비자보호법)",
+        body,
+    ):
+        return True
+    if re.search(r"(?:법률|법령|시행령)\s*(?:제\s*\d+\s*조|제\s*\d+\s*호)", body):
+        return True
+    return False
+
+
+def _legal_reference_slice_emit_allowed(
+    full_text: str, start: int, end_exclusive: int
+) -> tuple[bool, str]:
+    """Suppress legal_reference slices that are TOC pointers or guide front matter."""
+    chunk = full_text[start:end_exclusive]
+    if not chunk.strip():
+        return False, "filter:legal_blocked_empty_chunk"
+
+    early = chunk[:2200]
+    for phrase in _LEGAL_GUIDE_BLOCK_PHRASES:
+        if phrase in early:
+            return False, f"filter:legal_blocked_guide_phrase:{phrase}"
+
+    compact_early = re.sub(r"\s+", "", chunk[:1100])
+    if "약관에서인용된법령" in compact_early or "약관에서인용한법" in compact_early:
+        if re.search(r"[\.\．]\s*168|168\s*p", chunk[:520], flags=re.IGNORECASE):
+            if "보험용어해설" in compact_early or "보험용어 해설" in chunk[:900]:
+                return False, "filter:legal_blocked_pointer_glossary_toc_ladder"
+
+    head_line = chunk.splitlines()[0].strip()
+    compact_head = re.sub(r"\s+", "", head_line)
+    if re.search(r"(?:법·규정|법령)\s*\d{1,4}\s*p?\s*$", head_line, flags=re.IGNORECASE):
+        return False, "filter:legal_blocked_heading_same_line_page_pointer"
+    if re.search(r"(?:법·규정|법령)\s*\d{1,4}\s*p?\s*$", compact_head, flags=re.IGNORECASE):
+        return False, "filter:legal_blocked_heading_compact_page_pointer"
+
+    if not _legal_chunk_has_substantive_law_content(chunk):
+        return False, "filter:legal_blocked_missing_substantive_law_corpus"
+
+    return True, ""
 
 
 def _classify_line(line: str) -> tuple[SectionType, str, str] | None:
@@ -435,8 +499,13 @@ def assemble_document_sections(
                 emit = False
 
         if emit and c.section_type == "legal_reference":
-            if not _legal_slice_has_substantive_body(full_text, c.start_char_offset, next_start):
-                trace = trace + ["filter:legal_reference_insufficient_substantive_body"]
+            legal_ok, legal_reason = _legal_reference_slice_emit_allowed(
+                full_text,
+                c.start_char_offset,
+                next_start,
+            )
+            if not legal_ok:
+                trace = trace + [legal_reason]
                 emit = False
 
         conf = _assembly_confidence(c, region, emit=emit)

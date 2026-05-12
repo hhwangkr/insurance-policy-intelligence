@@ -415,6 +415,91 @@ def test_toc_like_backstop_suppresses_compact_legal_pointer() -> None:
     assert [s for s in sections if s.section_type == "legal_reference"] == []
 
 
+def test_kyobo_style_legal_glossary_toc_ladder_suppressed() -> None:
+    doc_id = "doc_kyobo_legal_toc_ladder"
+    body = "\n".join(
+        [
+            "약관에서인용된법령",
+            ". 168",
+            "보험용어해설",
+            ". 367",
+            "",
+            "Ⅰ. 보험약관 가이드",
+            "안내 문단입니다.",
+        ]
+    )
+    doc = Document(
+        document_id=doc_id,
+        metadata=_meta(doc_id),
+        pages=[_page(doc_id, 1, body)],
+        page_count=1,
+        total_char_count=len(body),
+        created_at=datetime.now(UTC),
+    )
+    sections = detect_sections(doc)
+    assert [s for s in sections if s.section_type == "legal_reference"] == []
+
+
+def test_legal_inline_page_pointer_line_suppressed() -> None:
+    doc_id = "doc_legal_inline"
+    body = "약관에서 인용한 법·규정 168p\n다음 안내는 요약입니다."
+    doc = Document(
+        document_id=doc_id,
+        metadata=_meta(doc_id),
+        pages=[_page(doc_id, 1, body)],
+        page_count=1,
+        total_char_count=len(body),
+        created_at=datetime.now(UTC),
+    )
+    sections = detect_sections(doc)
+    assert [s for s in sections if s.section_type == "legal_reference"] == []
+
+
+def test_legal_pointer_then_guide_suppressed() -> None:
+    doc_id = "doc_legal_then_guide"
+    body = "\n".join(
+        [
+            "약관에서 인용된 법령",
+            ". 168",
+            "보험약관 가이드",
+            "이어지는 안내입니다.",
+        ]
+    )
+    doc = Document(
+        document_id=doc_id,
+        metadata=_meta(doc_id),
+        pages=[_page(doc_id, 1, body)],
+        page_count=1,
+        total_char_count=len(body),
+        created_at=datetime.now(UTC),
+    )
+    sections = detect_sections(doc)
+    assert [s for s in sections if s.section_type == "legal_reference"] == []
+
+
+def test_substantive_legal_reference_emitted_with_law_corpus() -> None:
+    doc_id = "doc_real_legal"
+    body = "\n".join(
+        [
+            "약관에서 인용한 법·규정",
+            "이 약관은 민법 제103조, 보험업법 제95조 등 관계 법령을 따릅니다.",
+            "금융소비자보호법에 따른 설명의무를 이행합니다.",
+        ]
+    )
+    doc = Document(
+        document_id=doc_id,
+        metadata=_meta(doc_id),
+        pages=[_page(doc_id, 1, body)],
+        page_count=1,
+        total_char_count=len(body),
+        created_at=datetime.now(UTC),
+    )
+    sections = detect_sections(doc)
+    legal = [s for s in sections if s.section_type == "legal_reference"]
+    assert len(legal) == 1
+    assert "민법" in legal[0].text or "보험업법" in legal[0].text
+
+
 def test_real_body_article_not_suppressed_when_followed_by_clause_text() -> None:
     doc_id = "doc_real_article_body"
     clause = "이 보험계약의 목적은 피보험자의 생존 또는 사망 시 보험금을 지급하는 데 있습니다."
