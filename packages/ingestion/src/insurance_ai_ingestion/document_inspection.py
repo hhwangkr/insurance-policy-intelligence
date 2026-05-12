@@ -206,11 +206,9 @@ def format_markdown_report(
     )
     lines.append("")
     lines.append("```bash")
-    lines.append(
-        "uv run python -m insurance_ai_ingestion.inspect_documents \\\n"
-        "  --input-dir data/processed/documents \\\n"
-        "  --report-path data/processed/reports/ingestion_quality.md"
-    )
+    lines.append("uv run python -m insurance_ai_ingestion.inspect_documents \\")
+    lines.append("  --input-dir data/processed/documents \\")
+    lines.append("  --report-path data/processed/reports/ingestion_quality.md")
     lines.append("```")
     lines.append("")
     lines.append("## Aggregate")

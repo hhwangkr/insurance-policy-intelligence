@@ -40,7 +40,7 @@ def main(argv: list[str] | None = None) -> int:
         "--report-path",
         type=Path,
         default=None,
-        help=("Optional markdown report path (e.g. data/processed/reports/ingestion_quality.md)."),
+        help="Optional markdown report path (e.g. data/processed/reports/ingestion_quality.md).",
     )
     args = parser.parse_args(argv)
     _configure_stdio_utf8()
