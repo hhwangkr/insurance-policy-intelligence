@@ -56,6 +56,20 @@ class SectionCandidate(BaseModel):
     evidence: list[str] = Field(default_factory=list)
 
 
+class PolicyUnit(BaseModel):
+    """Deterministic product/variant span for multi-unit PDFs (marker line = unit start)."""
+
+    model_config = ConfigDict(str_strip_whitespace=True)
+
+    policy_unit_id: str
+    policy_unit_name: str
+    variant_name: str
+    start_page: int = Field(ge=1)
+    start_char_offset: int = Field(ge=0)
+    end_page: int = Field(ge=1)
+    end_char_offset: int = Field(ge=0)
+
+
 class DocumentSection(BaseModel):
     """Citation-ready section slice; ``text`` is always a substring of extracted source text."""
 
@@ -79,6 +93,18 @@ class DocumentSection(BaseModel):
         default_factory=list,
         description="Deterministic trace for validation (rules + region context).",
     )
+    policy_unit_id: str | None = Field(
+        default=None,
+        description="Policy unit whose [start,end] span contains this section start, if any.",
+    )
+    policy_unit_name: str | None = Field(
+        default=None,
+        description="Product name parsed from the variant marker line, if assigned.",
+    )
+    variant_name: str | None = Field(
+        default=None,
+        description="Product variant from marker (e.g. 적립형, 거치형, 즉시형), if assigned.",
+    )
 
 
 class DocumentSectionsArtifact(BaseModel):
@@ -91,4 +117,8 @@ class DocumentSectionsArtifact(BaseModel):
     sections: list[DocumentSection]
     page_regions: list[PageRegion] = Field(default_factory=list)
     section_candidates: list[SectionCandidate] = Field(default_factory=list)
+    policy_units: list[PolicyUnit] = Field(
+        default_factory=list,
+        description="Product/variant spans from 적립형·거치형 + 약관 markers; not legal sections.",
+    )
     created_at: datetime

@@ -3,6 +3,15 @@ from __future__ import annotations
 import re
 from typing import Protocol, runtime_checkable
 
+from insurance_ai_ingestion.section_detection_patterns import (
+    BYEOLPYO_PAREN_HEAD_PREFIX,
+    BYEOLPYO_PLAIN_COMPACT,
+    BYEOLPYO_PLAIN_TWO_TOKEN,
+    LEGAL_CITED_LAW_COMPACT,
+    LEGAL_CITED_LAW_LINE,
+    RELATED_LAW_HEADING,
+    RELATED_LAW_HEADING_PREFIX,
+)
 from insurance_ai_shared.models.document import Document
 from insurance_ai_shared.models.section import PageRegion, RegionType
 
@@ -12,13 +21,13 @@ def _appendix_heading_line_count(text: str) -> tuple[int, list[str]]:
     evidence: list[str] = []
     n = 0
     for line in text.splitlines():
-        if re.match(r"^\s*[\(（]\s*별표\s*\d+\s*[\)）]", line):
+        if BYEOLPYO_PAREN_HEAD_PREFIX.match(line):
             n += 1
             evidence.append("heading_line:byeolpyo_paren")
-        elif re.match(r"^\s*별표\s+\d+\s+\S", line):
+        elif BYEOLPYO_PLAIN_TWO_TOKEN.match(line):
             n += 1
             evidence.append("heading_line:byeolpyo_plain")
-        elif re.match(r"^\s*별표\s*\d+(?:\s+\S|\S)", line):
+        elif BYEOLPYO_PLAIN_COMPACT.match(line):
             n += 1
             evidence.append("heading_line:byeolpyo_plain_compact")
     return n, evidence
@@ -28,12 +37,12 @@ def _legal_heading_present(text: str) -> bool:
     """Boost legal_reference region only when a real legal-index heading appears."""
     for line in text.splitlines():
         s = line.strip()
-        if re.match(r"^\s*약관에서\s*인용(?:한|된)\s*법", s):
+        if LEGAL_CITED_LAW_LINE.match(s):
             return True
         compact = re.sub(r"\s+", "", s)
-        if re.match(r"^약관에서인용(?:한|된)법", compact):
+        if LEGAL_CITED_LAW_COMPACT.match(compact):
             return True
-        if re.match(r"^\s*관련\s*법규\s*$", s) or re.match(r"^\s*관련\s*법규\s*[:\：]", s):
+        if RELATED_LAW_HEADING.match(s) or RELATED_LAW_HEADING_PREFIX.match(s):
             return True
     return False
 
@@ -158,11 +167,11 @@ def _score_region(page_number: int, text: str) -> tuple[RegionType, float, list[
         evidence.append("keyword:toc_marker")
 
     toc_article_lines = _article_outline_line_count(stripped)
-    if toc_article_lines >= 4 and len(stripped) < 6000:
+    toc_page_ref_rows = _toc_style_page_ref_row_count(stripped)
+    if toc_article_lines >= 4 and len(stripped) < 6000 and toc_page_ref_rows >= 3:
         scores["toc"] += 45.0
         evidence.append(f"signal:many_article_outline_lines:{toc_article_lines}")
 
-    toc_page_ref_rows = _toc_style_page_ref_row_count(stripped)
     if toc_page_ref_rows >= 4:
         scores["toc"] += min(30.0 + 6.0 * float(toc_page_ref_rows), 95.0)
         evidence.append(f"signal:toc_page_reference_rows:{toc_page_ref_rows}")
@@ -199,6 +208,12 @@ def _score_region(page_number: int, text: str) -> tuple[RegionType, float, list[
     if len(stripped) > 3200:
         scores["policy_body"] += 28.0
         evidence.append("heuristic:long_page")
+
+    if _substantive_policy_body_heuristic(stripped):
+        scores["policy_body"] += 72.0
+        evidence.append("signal:policy_body_boost_substantive_clause_text")
+        scores["toc"] = min(scores["toc"], 40.0)
+        evidence.append("signal:toc_score_cap_when_substantive_clause_page")
 
     best = max(scores, key=lambda k: scores[k])
     best_score = scores[best]

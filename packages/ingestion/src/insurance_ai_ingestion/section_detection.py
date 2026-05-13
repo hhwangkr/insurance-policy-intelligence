@@ -3,10 +3,45 @@ from __future__ import annotations
 import re
 from datetime import UTC, datetime
 
+from insurance_ai_ingestion.policy_unit_detection import (
+    attach_policy_unit_metadata,
+    discover_policy_units,
+    first_product_unit_boundary_offset,
+    global_policy_tail_cutoff,
+    policy_unit_marker_hits,
+)
 from insurance_ai_ingestion.region_classification import (
     HeuristicRegionClassifier,
     RegionClassifier,
 )
+from insurance_ai_ingestion.section_detection_evidence import (
+    ASSEMBLY_SUBSTRING_SLICE,
+    FILTER_APPENDIX_INSUFFICIENT_SUBSTANTIVE_BODY,
+    FILTER_ARTICLE_INLINE_CLAUSE_REFERENCE_HEADING,
+    FILTER_KEEP_EXPLICIT_TOC_GUIDE_HEADING,
+    FILTER_MISSING_REGION_DEFAULT_KEEP,
+    FILTER_NOT_FRONT_MATTER_REGION_KEEP,
+    FILTER_POINTER_REFERENCE_HEADING_SLICE,
+    FILTER_SUPPRESS_NON_STRUCTURAL_ON_FRONT_MATTER,
+    FILTER_TOCLIKE_CANDIDATE_BACKSTOP,
+    candidate_id,
+    candidate_rule_confidence,
+    page_region,
+    page_region_confidence,
+    region_evidence,
+    suppress_structure_on_front_matter,
+)
+from insurance_ai_ingestion.section_detection_patterns import (
+    APPENDIX_PAREN,
+    APPENDIX_PLAIN,
+    ARTICLE,
+    LEGAL_GUIDE_POINTER,
+    PAGE_POINTER_TAIL,
+    PART,
+    RULE_MATCH_CONFIDENCE,
+    TOC_LINE,
+)
+from insurance_ai_ingestion.section_text_layout import document_full_text_index, page_for_offset
 from insurance_ai_shared.models.document import Document
 from insurance_ai_shared.models.section import (
     DocumentSection,
@@ -17,13 +52,15 @@ from insurance_ai_shared.models.section import (
     SectionType,
 )
 
-_RULE_MATCH_CONFIDENCE = 0.82
-
 _SUPPRESS_STRUCTURE_IN_REGIONS: frozenset[RegionType] = frozenset(
     {"toc", "guide", "cover", "summary"},
 )
 
 _STRUCTURE_SUPPRESS_TYPES: frozenset[SectionType] = frozenset(
+    {"article", "part", "appendix", "legal_reference", "glossary"},
+)
+
+_POINTER_REFERENCE_SUPPRESS_TYPES: frozenset[SectionType] = frozenset(
     {"article", "part", "appendix", "legal_reference", "glossary"},
 )
 
@@ -50,27 +87,12 @@ _LEGAL_GUIDE_BLOCK_PHRASES: tuple[str, ...] = (
     "관련법규 168p",
 )
 
-_TOC_LINE = re.compile(r"^[\s\[［【（(]*목\s*차[\s\]］】）)]*$")
-_APPENDIX_PAREN = re.compile(r"^\s*[\(（]\s*별표\s*(\d+)\s*[\)）]\s*(.*)$")
-_APPENDIX_PLAIN = re.compile(r"^\s*별표\s*(\d+)\s*(.+)$")
-_PART = re.compile(r"^\s*(제\s*\d+\s*관)\s*(.+)$")
-_ARTICLE = re.compile(r"^\s*(제\s*\d+\s*조)\s*(.*)$")
-
-_ARTICLE_APPENDIX_PROSE_OPENERS: tuple[str, ...] = (
+ARTICLE_APPENDIX_PROSE_OPENERS: tuple[str, ...] = (
     "이 계약은",
     "회사는",
     "계약자는",
     "보험수익자는",
     "피보험자는",
-)
-
-_PAGE_POINTER_TAIL = re.compile(
-    r"(?:[\.\．]\s*\d{1,4}\s*|\d{1,4}\s*p\s*)$",
-    re.IGNORECASE,
-)
-_LEGAL_GUIDE_POINTER = re.compile(
-    r"^\s*관련법규\s*\d+\s*p?\s*$",
-    re.IGNORECASE,
 )
 
 
@@ -83,53 +105,91 @@ def _collapse_ws(s: str) -> str:
     return re.sub(r"\s+", "", s)
 
 
-def _first_line_at_offset(full_text: str, offset: int) -> str:
-    if offset < 0 or offset >= len(full_text):
+def _heading_line_has_trailing_page_pointer(line: str) -> bool:
+    """TOC / guide row: short heading ending with dot-page or Np on the same line."""
+    s = line.strip()
+    if not s or len(s) > 140:
+        return False
+    if PAGE_POINTER_TAIL.search(s):
+        return True
+    if re.search(r"\d{1,4}\s*p\s*$", s, flags=re.IGNORECASE):
+        return True
+    return False
+
+
+def _first_non_empty_following_line(lines: list[str]) -> str | None:
+    i = 1
+    while i < len(lines):
+        t = lines[i].strip()
+        if t:
+            return t
+        i += 1
+    return None
+
+
+def _line_is_page_pointer_token(line: str) -> bool:
+    s = line.strip()
+    if re.fullmatch(r"[\.\．]\s*\d{1,4}", s):
+        return True
+    if re.fullmatch(r"\d{1,4}\s*p", s, flags=re.IGNORECASE):
+        return True
+    return False
+
+
+def _first_line_of_slice(full_text: str, start: int, end_exclusive: int) -> str:
+    if start < 0 or start >= len(full_text):
         return ""
-    line_end = full_text.find("\n", offset)
-    if line_end == -1:
-        return full_text[offset:]
-    return full_text[offset:line_end]
+    nl = full_text.find("\n", start)
+    if nl == -1 or nl >= end_exclusive:
+        return full_text[start:end_exclusive]
+    return full_text[start:nl]
 
 
-def _article_heading_line_looks_like_toc_outline_row(full_text: str, offset: int) -> bool:
-    """Dense TOC rows: dot leaders or same-line page refs (still pass the toc_like tail gate)."""
-    head = _first_line_at_offset(full_text, offset).strip()
-    if not re.match(r"^\s*제\s*\d+\s*조", head):
+def _article_heading_line_is_inline_clause_reference(line: str) -> bool:
+    """True when the line starts with 제N조 but continues as an in-text citation, not a heading."""
+    s = line.strip()
+    if len(s) > 220:
         return False
-    if len(head) > 140:
+    m = re.match(r"^\s*(제\s*\d+\s*조)(.*)$", s)
+    if not m:
         return False
-    if re.search(r"\.{4,}", head):
+    tail = (m.group(2) or "").strip()
+    if not tail:
+        return False
+    c = _collapse_ws(tail)
+    if re.search(
+        r"[）)].*(?:에따른|에따라|에서정한|에의한|와관련|과관련|의보험금지급사유)",
+        c,
+    ):
         return True
-    if re.search(r"(?:[\.\．]\s*\d{1,4}|\d{1,4}\s*p)\s*$", head, flags=re.IGNORECASE):
+    if re.search(r"[）)]\s*제\s*\d+\s*항", tail):
         return True
-    return False
-
-
-def _part_heading_line_looks_like_toc_outline_row(full_text: str, offset: int) -> bool:
-    head = _first_line_at_offset(full_text, offset).strip()
-    if not re.match(r"^\s*제\s*\d+\s*관", head):
-        return False
-    if len(head) > 140:
-        return False
-    if re.search(r"\.{4,}", head):
+    if re.search(r"[）)]\s*제\s*\d+\s*호", tail):
         return True
-    if re.search(r"(?:[\.\．]\s*\d{1,4}|\d{1,4}\s*p)\s*$", head, flags=re.IGNORECASE):
-        return True
-    return False
-
-
-def _appendix_heading_line_looks_like_toc_outline_row(full_text: str, offset: int) -> bool:
-    head = _first_line_at_offset(full_text, offset).strip()
-    if len(head) > 140:
-        return False
-    if not (head.startswith("(") or head.startswith("（") or "별표" in head):
-        return False
-    if re.search(r"\.{4,}", head):
-        return True
-    if re.search(r"(?:[\.\．]\s*\d{1,4}|\d{1,4}\s*p)\s*$", head, flags=re.IGNORECASE):
+    if re.search(r"\)제\d+항", c) or re.search(r"\)제\d+호", c):
         return True
     return False
+
+
+def _candidate_is_pointer_reference_heading_slice(
+    candidate: SectionCandidate,
+    full_text: str,
+    end_exclusive: int,
+) -> bool:
+    """TOC/guide pointer rows: heading then lone . 13 / 15p line (applies to any page_region)."""
+    if candidate.section_type not in _POINTER_REFERENCE_SUPPRESS_TYPES:
+        return False
+    chunk = full_text[candidate.start_char_offset : end_exclusive]
+    lines = chunk.splitlines()
+    if not lines:
+        return False
+    head = lines[0]
+    if _heading_line_has_trailing_page_pointer(head):
+        return True
+    nxt = _first_non_empty_following_line(lines)
+    if nxt is None:
+        return False
+    return _line_is_page_pointer_token(nxt)
 
 
 def _article_suppressed_in_appendix_region(
@@ -160,7 +220,7 @@ def _article_suppressed_in_appendix_region(
         if re.search(r"[）)]", head) and len(head) <= 78:
             return True, "filter:appendix_article_compact_paren_row"
 
-    if any(op in early_body for op in _ARTICLE_APPENDIX_PROSE_OPENERS):
+    if any(op in early_body for op in ARTICLE_APPENDIX_PROSE_OPENERS):
         return False, ""
 
     if len(body) >= 220:
@@ -174,7 +234,7 @@ def _legal_heading_line(s: str) -> bool:
     t = s.strip()
     if not t:
         return False
-    if _LEGAL_GUIDE_POINTER.match(t):
+    if LEGAL_GUIDE_POINTER.match(t):
         return False
     if re.match(r"^\s*관련법규\s*\d", t):
         return False
@@ -191,18 +251,18 @@ def _legal_heading_line(s: str) -> bool:
 def _appendix_paren_line_is_page_pointer(line: str) -> bool:
     """TOC-style appendix row: heading ends with dot/page number on the same line."""
     s = line.strip()
-    if not _APPENDIX_PAREN.match(line):
+    if not APPENDIX_PAREN.match(line):
         return False
-    if len(s) <= 120 and _PAGE_POINTER_TAIL.search(s):
+    if len(s) <= 120 and PAGE_POINTER_TAIL.search(s):
         return True
     return False
 
 
 def _appendix_plain_line_is_page_pointer(line: str) -> bool:
     s = line.strip()
-    if not _APPENDIX_PLAIN.match(line):
+    if not APPENDIX_PLAIN.match(line):
         return False
-    if len(s) <= 120 and _PAGE_POINTER_TAIL.search(s):
+    if len(s) <= 120 and PAGE_POINTER_TAIL.search(s):
         return True
     return False
 
@@ -336,13 +396,13 @@ def _classify_line(line: str) -> tuple[SectionType, str, str] | None:
     if not s:
         return None
 
-    if _TOC_LINE.match(s) or s in {"목차", "목 차"}:
+    if TOC_LINE.match(s) or s in {"목차", "목 차"}:
         return "toc", _strip_heading_title(s), "pattern:toc_heading"
 
     if s.startswith("고객권리안내문"):
         return "guide", _strip_heading_title(s), "pattern:customer_rights_heading"
 
-    m_ap = _APPENDIX_PAREN.match(line)
+    m_ap = APPENDIX_PAREN.match(line)
     if m_ap:
         if _appendix_paren_line_is_page_pointer(line):
             return None
@@ -354,7 +414,7 @@ def _classify_line(line: str) -> tuple[SectionType, str, str] | None:
             "pattern:appendix_paren",
         )
 
-    m_ap2 = _APPENDIX_PLAIN.match(line)
+    m_ap2 = APPENDIX_PLAIN.match(line)
     if m_ap2:
         if _appendix_plain_line_is_page_pointer(line):
             return None
@@ -362,13 +422,13 @@ def _classify_line(line: str) -> tuple[SectionType, str, str] | None:
         title = f"별표 {m_ap2.group(1)} {rest}".strip()
         return "appendix", _strip_heading_title(title), "pattern:appendix_plain"
 
-    m_part = _PART.match(line)
+    m_part = PART.match(line)
     if m_part:
         title = f"{m_part.group(1).replace(' ', '')} {m_part.group(2)}".strip()
         title = re.sub(r"\s+", " ", title)
         return "part", _strip_heading_title(title), "pattern:gwan_line"
 
-    m_art = _ARTICLE.match(line)
+    m_art = ARTICLE.match(line)
     if m_art:
         body = (m_art.group(2) or "").strip()
         title = f"{m_art.group(1).replace(' ', '')} {body}".strip()
@@ -434,7 +494,7 @@ def collect_section_candidates(document: Document) -> list[SectionCandidate]:
                     title=title,
                     start_page=page_numbers[idx],
                     start_char_offset=anchor,
-                    confidence=_RULE_MATCH_CONFIDENCE,
+                    confidence=RULE_MATCH_CONFIDENCE,
                     evidence=[ev, "generator:regex_rules_v1"],
                 )
             )
@@ -448,25 +508,6 @@ def collect_section_candidates(document: Document) -> list[SectionCandidate]:
             continue
         deduped.append(c)
     return deduped
-
-
-def _page_for_offset(
-    offset: int,
-    *,
-    page_starts: list[int],
-    page_numbers: list[int],
-    total_len: int,
-) -> int:
-    if total_len <= 0:
-        return page_numbers[0] if page_numbers else 1
-    if offset < 0:
-        offset = 0
-    if offset >= total_len:
-        offset = total_len - 1
-    for i in range(len(page_starts) - 1, -1, -1):
-        if page_starts[i] <= offset:
-            return page_numbers[i]
-    return page_numbers[0]
 
 
 def _regions_by_page(regions: list[PageRegion]) -> dict[int, PageRegion]:
@@ -494,7 +535,7 @@ def _candidate_is_toc_like_reference_row(
         return _tail_lines_are_only_page_references(tail)
 
     if candidate.section_type == "appendix":
-        if not (_APPENDIX_PAREN.match(lines[0]) or _APPENDIX_PLAIN.match(lines[0])):
+        if not (APPENDIX_PAREN.match(lines[0]) or APPENDIX_PLAIN.match(lines[0])):
             return False
         if _non_pointer_tail_chars(tail) >= _MIN_TOCLIKE_TAIL_SUBSTANTIVE_CHARS:
             return False
@@ -527,29 +568,29 @@ def _should_emit_candidate(
     region: PageRegion | None,
 ) -> tuple[bool, list[str]]:
     """Suppress structural headings on cover/toc/guide/summary; keep coarse toc/guide anchors."""
-    trace: list[str] = [f"candidate_rule_confidence:{candidate.confidence:.4f}"]
+    trace: list[str] = [candidate_rule_confidence(candidate.confidence)]
     if region is not None:
-        trace.append(f"page_region:{region.region_type}")
-        trace.append(f"page_region_confidence:{region.confidence:.4f}")
-        trace.extend(f"region_evidence:{e}" for e in region.evidence)
+        trace.append(page_region(region.region_type))
+        trace.append(page_region_confidence(region.confidence))
+        trace.extend(region_evidence(e) for e in region.evidence)
 
     if region is None:
-        trace.append("filter:missing_region_default_keep")
+        trace.append(FILTER_MISSING_REGION_DEFAULT_KEEP)
         return True, trace
 
     if region.region_type not in _SUPPRESS_STRUCTURE_IN_REGIONS:
-        trace.append("filter:not_front_matter_region_keep")
+        trace.append(FILTER_NOT_FRONT_MATTER_REGION_KEEP)
         return True, trace
 
     if candidate.section_type in _STRUCTURE_SUPPRESS_TYPES:
-        trace.append(f"filter:suppress_structure_on_front_matter:{region.region_type}")
+        trace.append(suppress_structure_on_front_matter(region.region_type))
         return False, trace
 
     if candidate.section_type in ("toc", "guide") and _explicit_front_matter_heading(candidate):
-        trace.append("filter:keep_explicit_toc_guide_heading")
+        trace.append(FILTER_KEEP_EXPLICIT_TOC_GUIDE_HEADING)
         return True, trace
 
-    trace.append("filter:suppress_non_structural_on_front_matter")
+    trace.append(FILTER_SUPPRESS_NON_STRUCTURAL_ON_FRONT_MATTER)
     return False, trace
 
 
@@ -587,6 +628,7 @@ def assemble_document_sections(
         pos += len(t) + 1
 
     by_page = _regions_by_page(page_regions)
+    pu_markers = policy_unit_marker_hits(full_text)
 
     accepted: list[tuple[SectionCandidate, list[str], float]] = []
     sorted_cands = sorted(
@@ -609,49 +651,45 @@ def assemble_document_sections(
             total_len=total_len,
             by_page=by_page,
         )
+        prod_cap = first_product_unit_boundary_offset(
+            pu_markers,
+            c.start_char_offset,
+            appendix_body_end,
+        )
+        appendix_substantive_end = (
+            min(appendix_body_end, prod_cap) if prod_cap is not None else appendix_body_end
+        )
 
         emit: bool
         trace: list[str]
         if _candidate_is_toc_like_reference_row(c, full_text, next_start):
             trace = [
-                f"candidate_rule_confidence:{c.confidence:.4f}",
-                "filter:toc_like_candidate_backstop",
+                candidate_rule_confidence(c.confidence),
+                FILTER_TOCLIKE_CANDIDATE_BACKSTOP,
             ]
             if region is not None:
-                trace.append(f"page_region:{region.region_type}")
-                trace.append(f"page_region_confidence:{region.confidence:.4f}")
-                trace.extend(f"region_evidence:{e}" for e in region.evidence)
+                trace.append(page_region(region.region_type))
+                trace.append(page_region_confidence(region.confidence))
+                trace.extend(region_evidence(e) for e in region.evidence)
+            emit = False
+        elif _candidate_is_pointer_reference_heading_slice(c, full_text, next_start):
+            trace = [
+                candidate_rule_confidence(c.confidence),
+                FILTER_POINTER_REFERENCE_HEADING_SLICE,
+            ]
+            if region is not None:
+                trace.append(page_region(region.region_type))
+                trace.append(page_region_confidence(region.confidence))
+                trace.extend(region_evidence(e) for e in region.evidence)
             emit = False
         else:
             emit, trace = _should_emit_candidate(c, region)
-            if (
-                not emit
-                and region is not None
-                and region.region_type == "toc"
-                and c.section_type in ("part", "article", "appendix")
-            ):
-                looks_toc = False
-                if c.section_type == "article":
-                    looks_toc = _article_heading_line_looks_like_toc_outline_row(
-                        full_text, c.start_char_offset
-                    )
-                elif c.section_type == "part":
-                    looks_toc = _part_heading_line_looks_like_toc_outline_row(
-                        full_text, c.start_char_offset
-                    )
-                else:
-                    looks_toc = _appendix_heading_line_looks_like_toc_outline_row(
-                        full_text, c.start_char_offset
-                    )
-                if not looks_toc:
-                    emit = True
-                    trace = trace + ["filter:toc_region_structural_emit_after_toc_like_gate"]
 
         if emit and c.section_type == "appendix":
             if not _appendix_slice_has_substantive_body(
-                full_text, c.start_char_offset, appendix_body_end
+                full_text, c.start_char_offset, appendix_substantive_end
             ):
-                trace = trace + ["filter:appendix_insufficient_substantive_body"]
+                trace = trace + [FILTER_APPENDIX_INSUFFICIENT_SUBSTANTIVE_BODY]
                 emit = False
 
         if emit and c.section_type == "legal_reference":
@@ -679,6 +717,12 @@ def assemble_document_sections(
                 trace = trace + [apx_art_reason]
                 emit = False
 
+        if emit and c.section_type == "article":
+            head_ln = _first_line_of_slice(full_text, c.start_char_offset, next_start)
+            if _article_heading_line_is_inline_clause_reference(head_ln):
+                trace = trace + [FILTER_ARTICLE_INLINE_CLAUSE_REFERENCE_HEADING]
+                emit = False
+
         conf = _assembly_confidence(c, region, emit=emit)
         if emit:
             accepted.append((c, trace, conf))
@@ -692,6 +736,10 @@ def assemble_document_sections(
     for i, (c, trace, asm_conf) in enumerate(accepted):
         section_id = f"{document.document_id}::sec::{i:04d}"
         next_start = accepted[i + 1][0].start_char_offset if i + 1 < len(accepted) else total_len
+        if c.section_type == "appendix":
+            prod = first_product_unit_boundary_offset(pu_markers, c.start_char_offset, next_start)
+            if prod is not None:
+                next_start = prod
         body = full_text[c.start_char_offset : next_start]
 
         parent_id: str | None = None
@@ -701,7 +749,7 @@ def assemble_document_sections(
             parent_id = last_part_id
 
         end_char = next_start
-        end_page = _page_for_offset(
+        end_page = page_for_offset(
             end_char - 1 if end_char > c.start_char_offset else c.start_char_offset,
             page_starts=starts,
             page_numbers=page_numbers,
@@ -709,8 +757,8 @@ def assemble_document_sections(
         )
 
         asm_evidence = trace + [
-            "assembly:substring_slice",
-            f"candidate_id:{c.candidate_id}",
+            ASSEMBLY_SUBSTRING_SLICE,
+            candidate_id(c.candidate_id),
         ]
 
         sections.append(
@@ -753,7 +801,10 @@ def run_section_detection(
 def detect_sections(document: Document) -> list[DocumentSection]:
     """Public API: final sections after rule candidates and heuristic region filtering."""
     sections, _, _ = run_section_detection(document)
-    return sections
+    full_text, _, _, _ = document_full_text_index(document)
+    units = discover_policy_units(document)
+    tail = global_policy_tail_cutoff(full_text, units)
+    return attach_policy_unit_metadata(sections, units, global_tail_cutoff=tail)
 
 
 def build_sections_artifact(
@@ -767,11 +818,30 @@ def build_sections_artifact(
         document,
         region_classifier=region_classifier,
     )
+    full_text, _, _, _ = document_full_text_index(document)
+    policy_units = discover_policy_units(document)
+    tail = global_policy_tail_cutoff(full_text, policy_units)
+    sections = attach_policy_unit_metadata(
+        sections,
+        policy_units,
+        global_tail_cutoff=tail,
+    )
     return DocumentSectionsArtifact(
         document_id=document.document_id,
         source_document_created_at=document.created_at,
         sections=sections,
         page_regions=regions,
         section_candidates=candidates,
+        policy_units=policy_units,
         created_at=stamp,
     )
+
+
+__all__ = [
+    "assemble_document_sections",
+    "build_sections_artifact",
+    "collect_section_candidates",
+    "detect_sections",
+    "discover_policy_units",
+    "run_section_detection",
+]

@@ -1,3 +1,15 @@
+"""Tests for ``section_detection`` and related heuristics.
+
+Groups (approximate; search for headings within this file):
+- **Core structure**: basic part/article hierarchy, pages, deterministic IDs.
+- **Front matter suppression**: TOC/guide regions, structure suppression, explicit keep rules.
+- **TOC / pointer suppression**: TOC-like rows, appendix pointers, legal pointer ladders.
+- **Appendix behavior**: substantive appendix slices, gates, 별표 splits.
+- **Inline article / clause references**: headings that are citations, not new articles.
+- **Policy units**: variant markers, dedupe, tail cutoff, multi-page marker/body.
+- **Legal / glossary**: substantive legal_reference emission, glossary headings.
+"""
+
 from __future__ import annotations
 
 from datetime import UTC, date, datetime
@@ -7,6 +19,7 @@ from insurance_ai_ingestion.section_detection import (
     build_sections_artifact,
     collect_section_candidates,
     detect_sections,
+    discover_policy_units,
     run_section_detection,
 )
 from insurance_ai_shared.models.document import Document, DocumentMetadata, DocumentPage
@@ -670,9 +683,9 @@ def test_appendix_region_suppresses_table_style_article_pins() -> None:
     assert arts == []
 
 
-def test_toc_region_override_emits_part_and_closes_article() -> None:
-    """Misclassified TOC pages still emit real 관/조 headings when lines are not TOC-row shaped."""
-    doc_id = "doc_toc_override_structure"
+def test_toc_region_suppresses_structural_candidates() -> None:
+    """Labeled TOC pages must not emit part/article/appendix/legal/glossary structural sections."""
+    doc_id = "doc_toc_suppress_structure"
     body = "\n".join(
         [
             "제35조 (배당금의지급)",
@@ -702,12 +715,400 @@ def test_toc_region_override_emits_part_and_closes_article() -> None:
         ),
     ]
     sections = assemble_document_sections(document=doc, candidates=cands, page_regions=regions)
-    titles = [s.title for s in sections]
-    assert any("제7관" in t for t in titles)
-    assert any("제36조" in t for t in titles)
-    sec35 = next(s for s in sections if s.section_type == "article" and "제35조" in s.title)
-    assert "제7관" not in sec35.text
-    assert "제36조" not in sec35.text
+    assert not any(
+        s.section_type in ("part", "article", "appendix", "legal_reference", "glossary")
+        for s in sections
+    )
+
+
+def test_pointer_reference_heading_slice_suppresses_dot_page_and_np() -> None:
+    doc_id = "doc_pointer_heading_slice"
+    body = "\n".join(
+        [
+            "제1관목적및용어의정의",
+            ". 13",
+            "제1조(목적)",
+            ". 13",
+            "제3조 (보험금의 지급사유)",
+            "15p",
+            "( 별표1 ) 보험금지급기준표",
+            ". 48",
+        ]
+    )
+    pages = [_page(doc_id, 1, body)]
+    doc = Document(
+        document_id=doc_id,
+        metadata=_meta(doc_id),
+        pages=pages,
+        page_count=1,
+        total_char_count=len(body),
+        created_at=datetime.now(UTC),
+    )
+    sections = detect_sections(doc)
+    assert [s for s in sections if s.section_type in ("part", "article", "appendix")] == []
+
+
+def test_inline_article_reference_heading_suppressed() -> None:
+    doc_id = "doc_inline_article_ref"
+    pad = "보험금 청구권에 관한 설명 문단입니다." * 8
+    body = "\n".join(
+        [
+            "제38조(소멸시효)",
+            pad,
+            "제3조(보험금의지급사유)에 따른 보험금지급사유가 2022년 이후 변경되었습니다.",
+            "제33조(해약환급금)에 따라 산출합니다.",
+        ]
+    )
+    pages = [_page(doc_id, 1, body)]
+    doc = Document(
+        document_id=doc_id,
+        metadata=_meta(doc_id),
+        pages=pages,
+        page_count=1,
+        total_char_count=len(body),
+        created_at=datetime.now(UTC),
+    )
+    sections = detect_sections(doc)
+    arts = [s for s in sections if s.section_type == "article"]
+    titles = [a.title for a in arts]
+    assert any("제38조" in t for t in titles)
+    assert not any("제3조" in t and "2022" in t for t in titles)
+    assert not any("제33조" in t and "해약" in t for t in titles)
+    sec38 = next(s for s in arts if "제38조" in s.title)
+    assert "제3조" in sec38.text
+
+
+def test_inline_article_reference_suppressed_clause_hang() -> None:
+    doc_id = "doc_inline_article_hang"
+    body = "\n".join(
+        [
+            "제38조(소멸시효)",
+            "본문입니다." * 20,
+            "제22조(계약의소멸) 제2항에서 정한 사망시 지급액을 안내합니다.",
+        ]
+    )
+    pages = [_page(doc_id, 1, body)]
+    doc = Document(
+        document_id=doc_id,
+        metadata=_meta(doc_id),
+        pages=pages,
+        page_count=1,
+        total_char_count=len(body),
+        created_at=datetime.now(UTC),
+    )
+    sections = detect_sections(doc)
+    arts = [s for s in sections if s.section_type == "article"]
+    assert len([a for a in arts if "제22조" in a.title]) == 0
+    sec38 = next(s for s in arts if "제38조" in s.title)
+    assert "제22조" in sec38.text
+
+
+def test_appendix_caps_before_product_variant_yakgwan_header() -> None:
+    doc_id = "doc_appendix_product_cap"
+    filler = "별표 본문 및 지급 기준에 대한 상세 설명입니다." * 15
+    pad = "약관 본문입니다. 회사는 계약자에게 안내합니다." * 12
+    body = "\n".join(
+        [
+            "( 별표 4 ) 기타 기준표",
+            filler,
+            "개인연금저축교보로연금보험(거치형)",
+            "약 관",
+            "제1관 목적 및 용어의 정의",
+            pad,
+            "제1조 (목적)",
+            "이 계약은 보험계약의 목적을 규정합니다." * 4,
+        ]
+    )
+    pages = [_page(doc_id, 1, body)]
+    doc = Document(
+        document_id=doc_id,
+        metadata=_meta(doc_id),
+        pages=pages,
+        page_count=1,
+        total_char_count=len(body),
+        created_at=datetime.now(UTC),
+    )
+    sections = detect_sections(doc)
+    apx4 = next(s for s in sections if s.section_type == "appendix" and "별표 4" in s.title)
+    assert "거치형" not in apx4.text
+    assert "약 관" not in apx4.text
+    assert any(s.section_type == "part" and "제1관" in s.title for s in sections)
+    assert any(s.section_type == "article" and s.title.startswith("제1조") for s in sections)
+    art = build_sections_artifact(document=doc)
+    assert len(art.policy_units) >= 1
+    assert art.policy_units[-1].variant_name == "거치형"
+    part1 = next(s for s in sections if s.section_type == "part" and "제1관" in s.title)
+    assert part1.variant_name == "거치형"
+
+
+def test_discover_policy_units_jeok_and_geochi_and_assign_variants() -> None:
+    doc_id = "doc_policy_units_two"
+    pad = "약관 본문입니다. 회사는 계약자에게 안내합니다." * 15
+    body = "\n".join(
+        [
+            "개인연금저축교보로연금보험(적립형)",
+            "약 관",
+            pad,
+            "제1관 목적 및 용어의 정의",
+            pad,
+            "제2관 보험금의 지급",
+            pad,
+            "개인연금저축교보로연금보험(거치형)",
+            "약 관",
+            "제1관 목적 및 용어의 정의",
+            pad,
+            "제1조 (목적)",
+            "이 계약은 보험계약의 목적을 규정합니다." * 6,
+        ]
+    )
+    pages = [_page(doc_id, 1, body)]
+    doc = Document(
+        document_id=doc_id,
+        metadata=_meta(doc_id),
+        pages=pages,
+        page_count=1,
+        total_char_count=len(body),
+        created_at=datetime.now(UTC),
+    )
+    units = discover_policy_units(doc)
+    assert len(units) == 2
+    assert units[0].variant_name == "적립형"
+    assert units[1].variant_name == "거치형"
+    art = build_sections_artifact(document=doc)
+    assert len(art.policy_units) == 2
+    parts = [s for s in art.sections if s.section_type == "part" and "제1관" in s.title]
+    assert len(parts) == 2
+    parts_sorted = sorted(parts, key=lambda s: s.start_char_offset)
+    assert parts_sorted[0].variant_name == "적립형"
+    assert parts_sorted[1].variant_name == "거치형"
+
+
+def test_policy_units_three_variants_including_jaesi() -> None:
+    doc_id = "doc_policy_units_three"
+    pad = "약관 본문입니다. 회사는 계약자에게 안내합니다." * 12
+    body = "\n".join(
+        [
+            "개인연금저축교보로연금보험(적립형)",
+            "약 관",
+            pad,
+            "제1관 목적 및 용어의 정의",
+            pad,
+            "개인연금저축교보로연금보험(거치형)",
+            "약 관",
+            pad,
+            "제1관 목적 및 용어의 정의",
+            pad,
+            "개인연금저축 교보로연금보험(즉시형)",
+            "약 관",
+            pad,
+            "제1관 목적 및 용어의 정의",
+            pad,
+            "제1조 (목적)",
+            "이 계약은 보험계약의 목적을 규정합니다." * 4,
+        ]
+    )
+    pages = [_page(doc_id, 1, body)]
+    doc = Document(
+        document_id=doc_id,
+        metadata=_meta(doc_id),
+        pages=pages,
+        page_count=1,
+        total_char_count=len(body),
+        created_at=datetime.now(UTC),
+    )
+    units = discover_policy_units(doc)
+    assert len(units) == 3
+    assert [u.variant_name for u in units] == ["적립형", "거치형", "즉시형"]
+    assert units[1].end_char_offset < units[2].start_char_offset
+    art = build_sections_artifact(document=doc)
+    parts = sorted(
+        [s for s in art.sections if s.section_type == "part" and "제1관" in s.title],
+        key=lambda s: s.start_char_offset,
+    )
+    assert len(parts) == 3
+    assert [p.variant_name for p in parts] == ["적립형", "거치형", "즉시형"]
+
+
+def test_legal_reference_sections_not_assigned_policy_unit() -> None:
+    doc_id = "doc_policy_units_legal_unassigned"
+    pad = "약관 본문입니다." * 20
+    filler_l = "민법 및 보험업법 등 관련 법령 조항을 인용합니다." * 6
+    body = "\n".join(
+        [
+            "개인연금저축교보로연금보험(적립형)",
+            "약 관",
+            pad,
+            "제1조 (목적)",
+            "이 계약은 목적입니다." * 4,
+            "약관에서 인용한 법·규정",
+            filler_l,
+        ]
+    )
+    pages = [_page(doc_id, 1, body)]
+    doc = Document(
+        document_id=doc_id,
+        metadata=_meta(doc_id),
+        pages=pages,
+        page_count=1,
+        total_char_count=len(body),
+        created_at=datetime.now(UTC),
+    )
+    art = build_sections_artifact(document=doc)
+    legal = [s for s in art.sections if s.section_type == "legal_reference"]
+    assert len(legal) == 1
+    assert legal[0].policy_unit_id is None
+    assert legal[0].variant_name is None
+    arts = [s for s in art.sections if s.section_type == "article" and "제1조" in s.title]
+    assert len(arts) == 1
+    assert arts[0].variant_name == "적립형"
+
+
+def test_policy_unit_marker_two_line_jaesi_followed_by_part_one() -> None:
+    doc_id = "doc_policy_unit_jaesi_two_line_part"
+    body = "\n".join(
+        [
+            "개인연금저축교보로연금보험(즉시형)",
+            "제1관 목적 및 용어의 정의",
+            "이 관은 목적을 규정합니다." * 4,
+        ]
+    )
+    pages = [_page(doc_id, 1, body)]
+    doc = Document(
+        document_id=doc_id,
+        metadata=_meta(doc_id),
+        pages=pages,
+        page_count=1,
+        total_char_count=len(body),
+        created_at=datetime.now(UTC),
+    )
+    units = discover_policy_units(doc)
+    assert len(units) == 1
+    assert units[0].variant_name == "즉시형"
+
+
+def test_policy_units_dedupe_consecutive_identical_variant_markers() -> None:
+    """Kyobo-style duplicate variant blocks collapse to one unit per variant."""
+    doc_id = "doc_policy_units_dedupe"
+    pad = "약관 본문입니다." * 12
+    body = "\n".join(
+        [
+            "개인연금저축교보로연금보험(거치형)",
+            "약 관",
+            "개인연금저축교보로연금보험(거치형)",
+            "약 관",
+            pad,
+            "제1관 목적 및 용어의 정의",
+            "본문입니다." * 8,
+        ]
+    )
+    pages = [_page(doc_id, 1, body)]
+    doc = Document(
+        document_id=doc_id,
+        metadata=_meta(doc_id),
+        pages=pages,
+        page_count=1,
+        total_char_count=len(body),
+        created_at=datetime.now(UTC),
+    )
+    units = discover_policy_units(doc)
+    assert len(units) == 1
+    assert units[0].variant_name == "거치형"
+    assert units[0].start_char_offset == 0
+    art = build_sections_artifact(document=doc)
+    assert len(art.policy_units) == 1
+    part = next(s for s in art.sections if s.section_type == "part" and "제1관" in s.title)
+    assert part.variant_name == "거치형"
+
+
+def test_policy_unit_geochi_spans_marker_page_and_body_next_page() -> None:
+    doc_id = "doc_geochi_marker_page_then_body"
+    p1 = "\n".join(
+        [
+            "개인연금저축교보로연금보험(거치형)",
+            "약 관",
+            "표지성짧은글.",
+        ]
+    )
+    p2 = "\n".join(
+        [
+            "제1관 목적 및 용어의 정의",
+            "본문입니다." * 12,
+        ]
+    )
+    pages = [_page(doc_id, 1, p1), _page(doc_id, 2, p2)]
+    doc = Document(
+        document_id=doc_id,
+        metadata=_meta(doc_id),
+        pages=pages,
+        page_count=2,
+        total_char_count=len(p1) + 1 + len(p2),
+        created_at=datetime.now(UTC),
+    )
+    units = discover_policy_units(doc)
+    assert len(units) == 1
+    assert units[0].variant_name == "거치형"
+    assert units[0].start_page == 1
+    assert units[0].end_page >= 2
+    art = build_sections_artifact(document=doc)
+    part = next(s for s in art.sections if s.section_type == "part" and "제1관" in s.title)
+    assert part.start_page == 2
+    assert part.variant_name == "거치형"
+
+
+def test_three_variants_tail_collapsed_inyong_clears_variant_after_cutoff() -> None:
+    doc_id = "doc_three_variants_tail_cut"
+    pad = "약관 본문입니다." * 10
+    tail_line = "아래법령은약관에서인용된법령으로고객의이해를돕기위해만들었습니다."
+    filler = "민법 및 형법 조문 인용입니다." * 6
+    body = "\n".join(
+        [
+            "개인연금저축교보로연금보험(적립형)",
+            "약 관",
+            pad,
+            "제1조 (목적)",
+            "적립형 본문." * 4,
+            "개인연금저축교보로연금보험(거치형)",
+            "약 관",
+            pad,
+            "제1조 (목적)",
+            "거치형 본문." * 4,
+            "개인연금저축교보로연금보험(즉시형)",
+            "약 관",
+            pad,
+            "제1조 (목적)",
+            "즉시형 본문." * 4,
+            tail_line,
+            filler,
+            "제28관 예금자보호법",
+            "법령 본문입니다." * 4,
+        ]
+    )
+    pages = [_page(doc_id, 1, body)]
+    doc = Document(
+        document_id=doc_id,
+        metadata=_meta(doc_id),
+        pages=pages,
+        page_count=1,
+        total_char_count=len(body),
+        created_at=datetime.now(UTC),
+    )
+    units = discover_policy_units(doc)
+    assert len(units) == 3
+    assert [u.variant_name for u in units] == ["적립형", "거치형", "즉시형"]
+    tail_idx = body.find("약관에서인용된법령")
+    assert tail_idx > 0
+    assert units[-1].end_char_offset < tail_idx
+    art = build_sections_artifact(document=doc)
+    assert len(art.policy_units) == 3
+    tail_secs = [s for s in art.sections if s.start_char_offset >= tail_idx]
+    assert tail_secs
+    assert all(s.variant_name is None for s in tail_secs)
+    arts = sorted(
+        [s for s in art.sections if s.section_type == "article" and "제1조" in s.title],
+        key=lambda s: s.start_char_offset,
+    )
+    assert len(arts) == 3
+    assert [a.variant_name for a in arts] == ["적립형", "거치형", "즉시형"]
 
 
 def test_appendix_substantive_gate_skips_suppressed_table_article_pins() -> None:
@@ -780,9 +1181,9 @@ def test_same_page_candidates_emitted_in_char_offset_order() -> None:
         PageRegion(
             document_id=doc_id,
             page_number=1,
-            region_type="toc",
+            region_type="unknown",
             confidence=0.9,
-            evidence=["test:forced_toc"],
+            evidence=["test:forced_unknown"],
         ),
     ]
     sections = assemble_document_sections(document=doc, candidates=cands, page_regions=regions)
