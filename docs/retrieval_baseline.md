@@ -199,7 +199,7 @@ These can return hits from **any** policy in the index; use when browsing, not w
 
 The file [`data/eval/retrieval_queries.yaml`](../data/eval/retrieval_queries.yaml) is **intentionally curated** for the **staged demo corpus** (queries, metadata filters, and expected section titles). It is **not** a universal contract that every future policy PDF must satisfy.
 
-**Generic** retrieval and citation behavior—metadata filters, valid citation IDs, deterministic citation bundles, validation rules, and inspection output—is covered by **`pytest`** and library APIs. When you add a new disclosure PDF, use **inspect CLIs and reports** first; add new YAML eval rows **only** when that product should join the **tracked benchmark set**. See [`testing_strategy.md`](testing_strategy.md).
+**Generic** retrieval and citation behavior—metadata filters, valid citation IDs, deterministic citation bundles—is covered by **`pytest`** and library APIs. When you add a new disclosure PDF, use **inspect CLIs and reports** first; add new YAML eval rows **only** when that product should join the **tracked benchmark set**. See [`testing_strategy.md`](testing_strategy.md).
 
 ## E5-style prefixes
 
@@ -252,74 +252,9 @@ Filter flags match **`search_index`** (`--document-id`, `--product-name`, `--pol
 This is the intended integration shape (all **in memory**; no required intermediate JSON file):
 
 1. User query + metadata filters (`SearchFilters`).
-2. `search_local_index` (or `build_citation_context`, which calls it with an embedder) → **`CitationContextBundle`** in RAM.
-3. `build_grounded_answer_prompt(bundle)` from `insurance_ai_generation.answer_prompt` → **`GroundedAnswerPrompt`** (system + user messages).
-4. **`generate_grounded_answer`** (`insurance_ai_generation.generate_grounded_answer`) with an **`LLMProvider`** implementation: send messages, parse **`GroundedAnswer`**, run **`validate_answer_citations`** against `prompt.citation_ids`. Today only **static/mock** providers exist; vendor SDKs are added later.
+2. `search_local_index` or `build_citation_context` → **`CitationContextBundle`** in RAM.
 
-Application code should call these Python functions directly; do not rely on shell round-trips through the filesystem for normal requests.
-
-### Debug / development path (saved JSON)
-
-For **reproducible inspection** or **manual QA**, you may optionally save a bundle with `build_citation_context --output-path …`, then run the CLI below to print a prompt JSON. That file path is **not** the normal data plane—only a convenience for humans and tests.
-
-### Grounded answer prompt (`build_answer_prompt`, debug only)
-
-`insurance_ai_generation.build_answer_prompt` reads a saved **`CitationContextBundle`** JSON (for example from `build_citation_context --output-path`), builds **deterministic** system/user chat messages for a future grounded answer step, and prints JSON to stdout. **No LLM** and no API clients—prompt construction only.
-
-**Do not** treat “save context JSON → `build_answer_prompt`” as the production architecture; it mirrors the same `CitationContextBundle` → `build_grounded_answer_prompt` logic you would call in process memory in step 3 above.
-
-Example (debug, using a saved bundle under `data/processed/reports/`):
-
-```bash
-uv run python -m insurance_ai_generation.build_answer_prompt \
-  --context-path data/processed/reports/citation_context_example.json
-```
-
-### Grounded answer schema and citation validation (Phase 2H-1, no LLM)
-
-`insurance_ai_generation.grounded_answer` defines a small **`GroundedAnswer`** model (prose + `citations_used` + `insufficient_context`), **`validate_answer_citations`** (default **structured** mode: non-empty allowed `citations_used` when answering; optional **`require_inline_markers=True`** for legacy strict **`[C1]`**-in-text matching), **`extract_citation_ids_from_text`**, **`render_grounded_answer_with_citations`** (deterministic display append of missing **`[Cn]`** from `citations_used`—formatting only, not validation repair), and **`render_citation_summary`** (optional lines from a **`CitationContextBundle`**). Use this **before or after** an LLM call—still **no LLM** in that module.
-
-**Phase 2H-2 (serving contract):** `insurance_ai_generation.llm_provider` exposes **`LLMRequest`** / **`LLMResponse`** and an **`LLMProvider`** protocol; **`StaticLLMProvider`** supports tests and offline demos. **`generate_grounded_answer`** wires prompt → provider → parse (JSON-first, plaintext fallback) → citation validation. **`provider_registry`** adds **`GenerationProviderConfig`** and **`create_llm_provider`** for **`static`** (fixed body) and **`ollama`** (local HTTP to Ollama; stdlib only, no vendor SDK). **Debug-only CLI** `python -m insurance_ai_generation.generate_answer` loads a **saved** citation-context JSON (same idea as `build_answer_prompt`), runs the registry provider, and prints **`answer`**, **`validation`**, provider metadata, **`rendered_answer`**, **`citation_summary`**, and raw model text—**not** the normal in-memory service flow.
-
-**Local Ollama (optional, free):** run [Ollama](https://ollama.com) on your machine (default base URL `http://localhost:11434`, override with `OLLAMA_BASE_URL`). Pull a model, then call the debug CLI with `--provider ollama --model <tag>`. **`generate_grounded_answer`** uses a **citation-aware JSON Schema** on `format` plus a **language-neutral** prompt. Many local models follow **`citations_used`** more reliably than inline **`[C1]`** prose; the **default** contract therefore validates **structured IDs** (non-empty `citations_used`, all IDs in **`VALID CITATION IDS`**): it checks **format and allowed citation IDs**, not whether the prose is faithful to each chunk. Near-misses like **`(C3 조항 참조)`** are not counted as **`[C3]`**; use **`render_grounded_answer_with_citations`** to append **`[Cn]`** for display from **`citations_used`** only (validation unchanged). **`render_citation_summary`** maps those IDs to **`section_title`** and page spans from the loaded **`CitationContextBundle`**. The debug **`generate_answer`** CLI prints the same structured **`answer`** JSON as before plus **`rendered_answer`** and **`citation_summary`** for deterministic display; optional **`--output-path`** mirrors that JSON to a file for inspection. **`--require-inline-citations`** on **`generate_answer`** restores strict inline matching for hosted-style evaluation. **`validation.is_valid`** still means the model output did not satisfy the chosen contract (not necessarily retrieval failure). **Answer faithfulness** (whether the model should have cited **`C1`** etc.) is **not** automatically judged; use **`inspect_answer`** (below) for manual review. **Citation validation** only checks the **JSON shape and allowed C-style IDs**; **`inspect_answer`** reports **cited vs uncited** retrieval rows so reviewers can spot faithfulness issues such as **omitting a more direct high-ranked passage** while still passing validation.
-
-### Grounded answer inspection (manual QA, no LLM)
-
-`insurance_ai_generation.inspect_grounded_answer` builds a **`GroundedAnswerInspection`** object: query, filters, validation, raw/rendered answer, **`citation_summary`**, every retrieved chunk as a short preview, plus **cited** vs **uncited** lists so reviewers can see omitted high-rank passages (for example **`C1`** when the model cites **`C2`/`C3`/`C5`** only). **`python -m insurance_ai_generation.inspect_answer`** reads a saved citation bundle and **`generate_answer`** JSON (**`--generation-result-path -`** for stdin), prints inspection JSON to stdout, and optionally **`--report-path`** for markdown.
-
-```bash
-uv run python -m insurance_ai_generation.generate_answer \
-  --context-path data/processed/reports/citation_context_example.json \
-  --provider static \
-  --static-response '{"answer":"stub","citations_used":["C2","C3","C5"],"insufficient_context":false}' \
-  --output-path data/processed/reports/generation_result_example.json
-
-uv run python -m insurance_ai_generation.inspect_answer \
-  --context-path data/processed/reports/citation_context_example.json \
-  --generation-result-path data/processed/reports/generation_result_example.json \
-  --report-path data/processed/reports/grounded_answer_inspection.md
-```
-
-**Debug CLI exit codes:** for `--provider ollama`, **`generate_answer` exits with status 1** if citation validation fails (after printing JSON). Use **`--no-fail-on-invalid`** to force exit 0, or **`--fail-on-invalid`** with `--provider static` to fail CI-style on bad static fixtures. Default for **`static`** is exit 0 even when validation fails.
-
-```bash
-ollama run qwen2.5:7b
-uv run python -m insurance_ai_generation.generate_answer \
-  --context-path data/processed/reports/citation_context_example.json \
-  --provider ollama \
-  --model qwen2.5:7b
-```
-
-Static / fixture example (no local LLM):
-
-```bash
-uv run python -m insurance_ai_generation.generate_answer \
-  --context-path data/processed/reports/citation_context_example.json \
-  --provider static \
-  --static-response '{"answer":"… [C1]","citations_used":["C1"],"insufficient_context":false}'
-```
-
-**No paid hosted LLM APIs or vendor SDKs** in this repo phase—remote paid adapters would plug in behind the same interface later.
+LLM answer generation is intentionally out of scope for the current MVP; the retrieval layer produces citation-ready context for future use. Downstream code may call `format_citation_bundle_json` or similar for logging; persisting a bundle to disk is optional (`build_citation_context --output-path`) for debugging or saved examples only.
 
 ## Known limitations
 

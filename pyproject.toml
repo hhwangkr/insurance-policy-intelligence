@@ -10,7 +10,6 @@ managed = true
 
 [tool.uv.sources]
 insurance-ai-api = { workspace = true }
-insurance-ai-generation = { workspace = true }
 insurance-ai-ingestion = { workspace = true }
 insurance-ai-retrieval = { workspace = true }
 insurance-ai-shared = { workspace = true }
@@ -20,7 +19,6 @@ members = [
     "apps/api",
     "packages/shared",
     "packages/evaluation",
-    "packages/generation",
     "packages/retrieval",
     "packages/ingestion",
 ]
@@ -30,7 +28,6 @@ dev = [
     "annotated-doc>=0.0.4",
     "httpx>=0.28",
     "insurance-ai-api",
-    "insurance-ai-generation",
     "insurance-ai-ingestion",
     "insurance-ai-retrieval",
     "insurance-ai-shared",
@@ -51,7 +48,6 @@ testpaths = [
     "apps/api/tests",
     "scripts/tests",
     "packages/ingestion/tests",
-    "packages/generation/tests",
     "packages/retrieval/tests",
 ]
 pythonpath = [
@@ -59,7 +55,6 @@ pythonpath = [
     "scripts",
     "packages/shared/src",
     "packages/ingestion/src",
-    "packages/generation/src",
     "packages/retrieval/src",
 ]
 
@@ -70,7 +65,6 @@ src = [
     "apps/api/src",
     "packages/shared/src",
     "packages/evaluation/src",
-    "packages/generation/src",
     "packages/retrieval/src",
     "packages/ingestion/src",
     "scripts",
@@ -94,7 +88,6 @@ files = [
     "apps/api/src",
     "packages/shared/src",
     "packages/evaluation/src",
-    "packages/generation/src",
     "packages/retrieval/src",
     "packages/ingestion/src",
     "scripts/staging_lib.py",
@@ -108,8 +101,6 @@ mypy_path = [
     "apps/api/src",
     "packages/shared/src",
     "packages/evaluation/src",
-    "packages/generation/src",
-    "packages/generation/tests",
     "packages/retrieval/src",
     "packages/retrieval/tests",
     "packages/ingestion/src",

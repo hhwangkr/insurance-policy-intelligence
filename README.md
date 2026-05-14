@@ -1,54 +1,44 @@
 # Insurance Policy Intelligence
 
-Production-grade AI platform for insurance document understanding, retrieval, and citation-grounded reasoning.
+Retrieval-first tooling for **public Korean insurance policy PDFs**: ingest disclosure PDFs into structured artifacts, detect sections, chunk with policy-unit awareness, build a **local dense retrieval index**, run **metadata-scoped search**, emit **citation-ready context** bundles, and evaluate retrieval against a curated YAML benchmark.
 
-> Exploring enterprise AI architecture for insurance policy intelligence.
+> Applied systems engineering for insurance document intelligence—not a hosted LLM product.
 
 ---
 
 ## Why This Project Exists
 
-Insurance policy documents are difficult for LLM systems because they contain:
+Insurance policy documents are difficult to use in automated pipelines because they contain exclusion clauses, long-context dependencies, nested section hierarchies, ambiguous legal language, product-specific endorsements, and frequent revisions.
 
-- exclusion clauses
-- long-context dependencies
-- nested section hierarchies
-- ambiguous legal language
-- product-specific endorsements
-- frequent policy revisions
+Naive chunk-and-embed workflows often fail because chunk boundaries break meaning, exclusions are inconsistently retrieved, and downstream consumers lack stable citation handles.
 
-Naive RAG pipelines often fail in insurance workflows because:
+This repository focuses on:
 
-- chunk boundaries break semantic meaning
-- exclusions are inconsistently retrieved
-- citations become unreliable
-- generated answers are difficult to audit
+- section-aware chunking and metadata preservation
+- local semantic retrieval with explicit filters
+- deterministic citation IDs in query-time bundles
+- evaluation against curated queries
 
-This repository explores how to build a more reliable insurance AI architecture using:
-
-- hybrid retrieval
-- semantic chunking
-- citation grounding
-- evaluation-first design
-- agentic workflows
+LLM answer generation is intentionally out of scope for the current MVP; the retrieval layer produces citation-ready context for future use.
 
 ---
 
-## Architecture
+## Architecture (MVP)
 
 ```text
 Insurance PDFs
       ↓
 Ingestion Pipeline
       ↓
-Semantic Chunking
+Section detection
       ↓
-Hybrid Retrieval
-(BM25 + Vector)
+Policy-unit / variant-aware chunking
       ↓
-Citation-Grounded Reasoning
+Local retrieval index (dense embeddings)
       ↓
-Agent Workflows
+Metadata-scoped search + citation context bundle
+      ↓
+Retrieval evaluation (YAML-driven)
 ```
 
 ---
@@ -57,34 +47,32 @@ Agent Workflows
 
 ```text
 apps/
-  api/            # FastAPI backend
-  web/            # Frontend app
+  api/            # FastAPI backend (health, minimal surface)
+  web/            # Frontend app (scaffolding / out of MVP focus)
 
 packages/
-  ingestion/      # PDF ingestion
-  retrieval/      # Search/retrieval, citation context
-  generation/     # Grounded prompt, answer schema, LLMProvider contract (mocks only; no live APIs)
+  ingestion/      # PDF ingestion, sections, chunking
+  retrieval/      # Index, search, citation context, retrieval eval
   evaluation/     # Evaluation pipelines (reserved)
   shared/         # Shared models/types
 
 data/
-  inbox/manual/   # tracked original disclosure-room PDFs (filenames preserved; see docs/data-staging.md)
-  raw/manual/     # tracked normalized, hash-keyed PDFs (ingestion reads manifest source_file here)
-  processed/      # generated full JSON per document (*.json gitignored; see docs/data-staging.md)
-  manifests/      # YAML manifest — lineage between originals and normalized paths
+  inbox/manual/   # tracked original disclosure-room PDFs
+  raw/manual/     # tracked normalized, hash-keyed PDFs
+  processed/      # generated artifacts (mostly gitignored)
+  manifests/      # YAML manifest — lineage
+  eval/           # curated retrieval benchmark YAML
 
 examples/
-  processed_documents/   # curated sample processed JSON (schema reference)
+  processed_documents/   # curated sample processed JSON
 
 scripts/          # operational helpers (see docs/data-staging.md)
-                  #   stage_manual_pdf.py   — single-file manual staging (explicit CLI)
-                  #   stage_manual_inbox.py — rule-based inbox batch + manual.yaml
 
 docs/
-  data-staging.md      # Manual PDF staging and manifest conventions
-  overfitting_audit.md # Corpus vs invariant coupling inventory (see testing_strategy)
-  testing_strategy.md  # pytest vs curated eval vs reports (see "Testing and evaluation strategy")
+  data-staging.md, retrieval_baseline.md, testing_strategy.md, overfitting_audit.md, …
+
 infra/
+  docker/         # API image build
 ```
 
 ---
@@ -93,15 +81,14 @@ infra/
 
 ### Backend
 
-- Python
-- FastAPI
+- Python 3.12+
+- FastAPI (minimal API package)
 - Pydantic v2
 
-### AI
+### Retrieval
 
-- LangGraph
-- Hybrid Retrieval
-- Qdrant
+- sentence-transformers (default embedding model)
+- NumPy local index (cosine similarity)
 
 ### Tooling
 
@@ -123,16 +110,16 @@ infra/
 - Policy unit / variant assignment
 - Section-aware chunking
 - Local dense semantic retrieval over chunks, with **metadata-scoped search** (insurer, product type, optional variant)
-- **Retrieval evaluation harness** driven by a **curated YAML query set** at [`data/eval/retrieval_queries.yaml`](data/eval/retrieval_queries.yaml) (benchmark for the demo corpus; see [`docs/testing_strategy.md`](docs/testing_strategy.md) and [`docs/retrieval_baseline.md`](docs/retrieval_baseline.md))
-- **Generation layer:** language-neutral grounded prompt; **structured** citation validation (default) on allowed **`citations_used`** (format / ID contract, not prose faithfulness); optional **`--require-inline-citations`** for strict **`[C1]`**-in-text mode; **`render_grounded_answer_with_citations`** and **`render_citation_summary`**; **`inspect_grounded_answer`** / **`inspect_answer`** for manual cited-vs-uncited inspection (markdown optional); **`GroundedAnswer`**, **`LLMProvider`**, **`generate_grounded_answer`**, **`provider_registry`**, debug CLIs **`build_answer_prompt`** / **`generate_answer`** (optional **`--output-path`**; **`--fail-on-invalid`** defaults on for Ollama; no paid APIs)
+- **Citation context** (`CitationContextBundle`) built at query time via `build_citation_context`
+- **Retrieval evaluation harness** driven by [`data/eval/retrieval_queries.yaml`](data/eval/retrieval_queries.yaml) (see [`docs/testing_strategy.md`](docs/testing_strategy.md) and [`docs/retrieval_baseline.md`](docs/retrieval_baseline.md))
 
-**Not yet**
+**Not yet / out of scope for this MVP**
 
-- Answer generation or LLM-based RAG
-- Frontend app workflows beyond scaffolding
+- LLM answer synthesis, provider registries, or hosted model calls
+- Frontend app workflows beyond any existing scaffolding
 - Cross-reference graph across articles
-- Reranking (beyond raw embedding similarity)
-- Production vector database (Qdrant server, hosted indexes)
+- Reranking beyond raw embedding similarity
+- Production vector database service (hosted Qdrant, Pinecone, etc.)
 
 ---
 
@@ -230,7 +217,7 @@ More scoped smoke examples: [`docs/retrieval_baseline.md`](docs/retrieval_baseli
 
 **J. Build citation context bundle (query-time JSON)**
 
-`build_citation_context` runs the same retrieval as **I** but emits a **structured JSON bundle** (citations `C1`, `C2`, … with full chunk metadata and text) for a future grounded-answer step. The bundle is **built per request** in memory; in a normal query path you would call the library API and pass the result downstream without treating it as a pipeline artifact.
+`build_citation_context` runs the same retrieval as **I** but emits a **structured JSON bundle** (citations `C1`, `C2`, … with full chunk metadata and text) for downstream use. The bundle is **built per request** in memory; in a normal query path you would call the library API and pass the result downstream without treating it as a pipeline artifact.
 
 ```bash
 uv run python -m insurance_ai_retrieval.build_citation_context \
@@ -244,8 +231,6 @@ uv run python -m insurance_ai_retrieval.build_citation_context \
 ```
 
 By default the JSON is printed to **stdout** only. **`--output-path`** is optional and is for **debugging**, **reproducible examples**, or **manual inspection**—saved citation-context JSON files are **not** part of the tracked dataset or the normal ingestion/index outputs. See [`docs/retrieval_baseline.md`](docs/retrieval_baseline.md).
-
-The usual path to a grounded prompt is **in memory**: `build_citation_context` → `CitationContextBundle` → `insurance_ai_generation.answer_prompt.build_grounded_answer_prompt` → (future LLM). The `build_answer_prompt` CLI (`python -m insurance_ai_generation.build_answer_prompt`), which reads a **saved** bundle JSON, is for **development/debugging** only—not the normal service flow.
 
 **K. Run retrieval evaluation (after index exists)**
 
@@ -276,10 +261,10 @@ Cases live in [`data/eval/retrieval_queries.yaml`](data/eval/retrieval_queries.y
 
 ## Testing and evaluation strategy
 
-- **`pytest`** (under `packages/*/tests/`) should mostly guard **reusable pipeline invariants** (schemas, filters, deterministic citation handles, validation rules, inspection shapes)—not every product-specific section title.
-- **`data/eval/*.yaml`** (e.g. [`data/eval/retrieval_queries.yaml`](data/eval/retrieval_queries.yaml)) holds **curated benchmark fixtures** for the **current demo corpus**. Extend them when a new document is meant to join that benchmark set.
+- **`pytest`** (under `packages/*/tests/`) should mostly guard **reusable pipeline invariants** (schemas, filters, deterministic citation handles)—not every product-specific section title.
+- **`data/eval/*.yaml`** (e.g. [`data/eval/retrieval_queries.yaml`](data/eval/retrieval_queries.yaml)) holds **curated benchmark cases** for the **current demo corpus**. Extend them when a new document is meant to join that benchmark set.
 - **Adding a new PDF** normally means manifest → ingest → section/chunk/index steps → **run generic tests** → **inspect markdown reports**; it should **not** by default require editing Python tests.
-- **Quality and inspection reports** (`inspect_*` CLIs, `data/processed/reports/*.md`, optional grounded-answer inspection) are the first tools for new documents; **manual review** covers faithfulness until an automated judge exists.
+- **Quality and inspection reports** (`inspect_*` CLIs, `data/processed/reports/*.md`) are the first tools for new documents; **manual review** covers semantic quality until automated judges exist.
 
 See [`docs/testing_strategy.md`](docs/testing_strategy.md) for the full checklist and principles.
 
@@ -349,13 +334,13 @@ This repository prioritizes:
 - maintainability
 - observability
 - evaluation
-- modular AI architecture
-- production readiness
+- modular layout
+- reproducible retrieval baselines
 
 over:
 
 - demo-oriented shortcuts
-- prompt-only implementations
+- prompt-only “RAG” without solid retrieval
 - generic chatbot UX
 
 ---

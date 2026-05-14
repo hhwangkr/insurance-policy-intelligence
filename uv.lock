@@ -10,7 +10,6 @@ resolution-markers = [
 members = [
     "insurance-ai-api",
     "insurance-ai-evaluation",
-    "insurance-ai-generation",
     "insurance-ai-ingestion",
     "insurance-ai-retrieval",
     "insurance-ai-shared",
@@ -520,23 +519,6 @@ version = "0.1.0"
 source = { editable = "packages/evaluation" }
 
 [[package]]
-name = "insurance-ai-generation"
-version = "0.1.0"
-source = { editable = "packages/generation" }
-dependencies = [
-    { name = "insurance-ai-retrieval" },
-    { name = "insurance-ai-shared" },
-    { name = "pydantic" },
-]
-
-[package.metadata]
-requires-dist = [
-    { name = "insurance-ai-retrieval", editable = "packages/retrieval" },
-    { name = "insurance-ai-shared", editable = "packages/shared" },
-    { name = "pydantic", specifier = ">=2.10" },
-]
-
-[[package]]
 name = "insurance-ai-ingestion"
 version = "0.1.0"
 source = { editable = "packages/ingestion" }
@@ -593,7 +575,6 @@ dev = [
     { name = "annotated-doc" },
     { name = "httpx" },
     { name = "insurance-ai-api" },
-    { name = "insurance-ai-generation" },
     { name = "insurance-ai-ingestion" },
     { name = "insurance-ai-retrieval" },
     { name = "insurance-ai-shared" },
@@ -614,7 +595,6 @@ dev = [
     { name = "annotated-doc", specifier = ">=0.0.4" },
     { name = "httpx", specifier = ">=0.28" },
     { name = "insurance-ai-api", editable = "apps/api" },
-    { name = "insurance-ai-generation", editable = "packages/generation" },
     { name = "insurance-ai-ingestion", editable = "packages/ingestion" },
     { name = "insurance-ai-retrieval", editable = "packages/retrieval" },
     { name = "insurance-ai-shared", editable = "packages/shared" },

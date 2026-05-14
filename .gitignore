@@ -47,8 +47,6 @@ data/processed/reports/*.md
 
 # Optional query-time citation context JSON (debug / examples only; see README and docs/retrieval_baseline.md)
 data/processed/reports/*citation_context*.json
-data/processed/reports/*generation_result*.json
-data/processed/reports/*grounded_answer_inspection*.md
 
 # Generated chunk artifacts
 data/processed/chunks/*.chunks.json

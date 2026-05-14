@@ -87,11 +87,10 @@ alwaysApply: true
 Use this layout; do not introduce parallel top-level `routers/`, `services/`, `agents/`, etc. outside the apps and packages below.
 
 - **apps/api/** — FastAPI app, routers, configuration, dependency injection, lifespan
-- **apps/web/** — Next.js UI, citations, workflow visualization
-- **packages/retrieval/** — Chunking, embedding, vector and BM25 search, hybrid retrieval, reranking
-- **packages/generation/** — Grounded prompts, answer schema, future LLM provider adapters (no agent runtime here)
-- **packages/ingestion/** — PDF parsing, loading, normalization, metadata extraction
-- **packages/evaluation/** — Retrieval, citation, and hallucination evaluation; benchmarks
+- **apps/web/** — Next.js UI (scaffolding; not the MVP focus)
+- **packages/retrieval/** — Local dense index, metadata-scoped search, citation context bundle, retrieval evaluation
+- **packages/ingestion/** — PDF parsing, loading, normalization, section detection, chunking
+- **packages/evaluation/** — Reserved evaluation package surface
 - **packages/shared/** — Shared Pydantic models, types, constants, utilities
 - **docs/** — Architecture, retrieval, and evaluation notes
 - **infra/** — Docker, compose, local infrastructure configuration

@@ -1,7 +1,9 @@
 # Product / document overfitting audit
 
 **Date:** 2026-05-14  
-**Scope:** `packages/ingestion/src`, `packages/ingestion/tests`, `packages/retrieval/src`, `packages/retrieval/tests`, `packages/generation/src`, `packages/generation/tests`, `scripts/`, plus pointers to `README.md`, `docs/*.md`, `data/eval/retrieval_queries.yaml`.  
+**Scope (active MVP):** `packages/ingestion/src`, `packages/ingestion/tests`, `packages/retrieval/src`, `packages/retrieval/tests`, `scripts/`, plus pointers to `README.md`, `docs/*.md`, `data/eval/retrieval_queries.yaml`.  
+**Note:** `packages/generation` existed when this audit was written; it was **removed from the workspace** afterward (LLM answer layer intentionally deferred). Rows that referenced generation tests are **historical** and listed only for traceability.
+
 **Search terms:** `kyobolife`, `samsunglife`, `miraeassetlife`, Korean insurer tokens, `제7조` / `제22조` / `별표` / `청약` / `특별계정`, product slugs (`internet_cancer`, `balance_whole_life`, `variable_annuity`, …), effective dates `20260101`, `20260401`, and full demo `document_id` strings.
 
 ## Assumptions
@@ -33,7 +35,7 @@ Refactoring without an inventory risks (a) deleting coverage that still encodes 
 |----------|---------|--------|
 | **A** | `data/eval/retrieval_queries.yaml`, README / `docs/retrieval_baseline.md` / `docs/testing_strategy.md` CLI examples | Expected benchmark and documentation coupling. |
 | **B** | No isolated “bug #…” regression blocks identified in this pass | Some tests act as **implicit** regressions; treat as **C + comment** unless ticket-linked. |
-| **C** | **Concentrated** in `packages/retrieval/tests/*` (repeated demo `document_id` / `kyobolife` filters), `packages/ingestion/tests/test_section_detection.py` (Kyobo-style product names), `packages/generation/tests` (prompt example string) | Mostly **synthetic fixtures**; risk is **maintenance churn** if corpus IDs change, not wrong behavior. **Partially mitigated (2026-05-14):** shared `demo_corpus_fixtures.py` + file-level comments in retrieval and ingestion tests (see follow-up below). |
+| **C** | **Concentrated** in `packages/retrieval/tests/*` (repeated demo `document_id` / `kyobolife` filters), `packages/ingestion/tests/test_section_detection.py` (Kyobo-style product names) | Mostly **synthetic fixtures**; risk is **maintenance churn** if corpus IDs change, not wrong behavior. **Partially mitigated (2026-05-14):** shared `demo_corpus_fixtures.py` + file-level comments in retrieval and ingestion tests (see follow-up below). |
 | **D** | **No** insurer/product string matches under `packages/retrieval/src` or `packages/ingestion/src` | No `if kyobolife` style production coupling found in audited packages. |
 | **E** | `document_id.py` product-type ordering table; `scripts/rule_extraction.py` Korean→slug keyword map; ingestion **별표 / 제N조** regex patterns | Domain and filename-convention coupling; document as mapping/config surface. |
 
@@ -46,7 +48,6 @@ Refactoring without an inventory risks (a) deleting coverage that still encodes 
 | [`data/eval/retrieval_queries.yaml`](../data/eval/retrieval_queries.yaml) | Queries, filters, `expected_any_section_titles` for Kyobo / Samsung / Mirae cases | Curated benchmark for **current** staged PDFs | **keep** |
 | [`README.md`](../README.md) | CLI examples with `kyobolife`, Korean queries | Onboarding / smoke docs | **keep** |
 | [`docs/retrieval_baseline.md`](retrieval_baseline.md) | `search_index` / `build_citation_context` examples | Same | **keep** |
-| [`packages/generation/src/insurance_ai_generation/answer_prompt.py`](../packages/generation/src/insurance_ai_generation/answer_prompt.py) | Valid JSON example: `별표 3의 기준에 따라…` | Prompt **illustration**, not retrieval logic | **keep** (optional later: language-neutral Latin example if desired) |
 
 ---
 
@@ -70,8 +71,6 @@ These use **real demo** `document_id` hashes or **Kyobo-like** marketing strings
 | `packages/retrieval/tests/test_retrieval_evaluation.py` | `_KYOBO_DOC`, YAML-ish dicts with `kyobolife` filters | Same | **Addressed (partial):** uses `demo_corpus_fixtures` + module comment. |
 | `packages/retrieval/tests/test_citation_context.py` | `document_id="kyobolife_annuity_…"`, `SearchFilters(insurer="kyobolife")` | Same | **Addressed (partial):** uses `demo_corpus_fixtures` + comment after imports. |
 | `packages/retrieval/tests/test_document_id.py` | Rows mapping full `document_id` → expected `insurer` / `product_name` / `effective_date` | **Borderline C/E**: asserts **parsing contract** for known filenames—legitimate, but **tied to current slug vocabulary** | **keep**; when new products appear, **extend rows** here or in docs—not scattered assertions elsewhere. |
-| `packages/generation/tests/test_answer_prompt.py` | `filters: kyobolife`, `assert "별표 3의 기준…" in system` | Locks **prompt text** example | **keep**; if prompt copy changes often, **relax** to substring checks already partially used. |
-| `packages/generation/tests/test_inspect_grounded_answer.py` | `section_title="( 별표 3 )"`, `제22조`, `제7조` in synthetic bundle | Inspection **shape** test using realistic titles | **keep** (titles are generic Korean **article/appendix** forms, not one PDF exclusive). |
 | `packages/ingestion/tests/test_section_detection.py` | Strings like `개인연금저축교보로연금보험(적립형)`, `미래에셋생명 변액연금보험`, `제15조 (청약의 철회)` | **Highest C signal**: encodes **real product marketing names** from the demo set inside layout tests | **Partially addressed:** module docstring now states Korean product/heading strings are **layout fixtures**, not benchmark expectations for a specific revision; retrieval expectations belong in `data/eval/*.yaml`. **Optional later:** neutral fabricated names that still hit the same regex paths. |
 | `packages/ingestion/tests/test_chunk_sections.py` | `( 별표 1 )` synthetic | Appendix chunking behavior | **keep** |
 | `packages/retrieval/tests/test_retrieval_baseline.py` | Query / chunk text `청약 철회` | Korean **generic** query words—low overfitting | **keep** |
@@ -85,7 +84,6 @@ These use **real demo** `document_id` hashes or **Kyobo-like** marketing strings
 |------|--------|
 | `packages/retrieval/src` | **No** matches for `kyobolife` / `samsunglife` / `miraeassetlife`. |
 | `packages/ingestion/src` | **No** insurer slug literals found in audited paths. |
-| `packages/generation/src` | Aside from **prompt documentation strings** in `answer_prompt.py`, no corpus-specific branches. |
 
 **Conclusion:** No **D**-class “`if insurer == kyobolife`” coupling was found in audited `packages/*/src` trees.
 
@@ -117,12 +115,13 @@ These use **real demo** `document_id` hashes or **Kyobo-like** marketing strings
 1. **C / ingestion:** Extended the **module docstring** in `test_section_detection.py` with an explicit **fixture policy** (layout vs benchmark vs `data/eval/*.yaml`).
 2. **C / retrieval tests:** Added `packages/retrieval/tests/demo_corpus_fixtures.py` and switched `test_retrieval_baseline.py`, `test_retrieval_evaluation.py`, and `test_citation_context.py` to import shared demo `document_id` / slug constants; augmented comments at the top of baseline/evaluation/citation tests.
 3. **Eval vs pytest:** Unchanged principle—if a test asserts **hit titles** that duplicate `retrieval_queries.yaml`, **move expectation to YAML** per [`testing_strategy.md`](testing_strategy.md). No eval YAML edits in this follow-up.
+4. **MVP prune:** Removed `packages/generation` from the workspace; LLM answer layer is deferred (see `README.md` / `docs/testing_strategy.md`).
 
-Remaining **C** exposure (unchanged by this pass): `test_document_id.py` row table, generation prompt/inspection tests, and any future new literals outside `demo_corpus_fixtures`.
+Remaining **C** exposure: `test_document_id.py` row table and any future new literals outside `demo_corpus_fixtures`.
 
 ---
 
 ## Verification
 
 - **Initial audit commit:** documentation only (no code changes).  
-- **Follow-up commit:** test-only and doc updates; **no** production, ranking, or generation logic changes. Run `uv run ruff check`, `uv run mypy`, and `uv run pytest` after the follow-up.
+- **Follow-up + MVP prune:** workspace and docs updated; **`packages/generation` removed**; run `uv run ruff check`, `uv run mypy`, and `uv run pytest` on current `main`.
