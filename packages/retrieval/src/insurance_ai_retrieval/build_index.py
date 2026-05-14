@@ -6,18 +6,7 @@ from pathlib import Path
 
 from insurance_ai_retrieval.embedder import LocalSentenceTransformerEmbedder
 from insurance_ai_retrieval.index_engine import build_local_index
-
-
-def _configure_stdout_utf8() -> None:
-    enc = getattr(sys.stdout, "encoding", None) or ""
-    if enc.casefold() == "utf-8".casefold():
-        return
-    reconf = getattr(sys.stdout, "reconfigure", None)
-    if callable(reconf):
-        try:
-            reconf(encoding="utf-8", errors="replace")
-        except (OSError, ValueError, AttributeError):
-            pass
+from insurance_ai_shared.stdio_utf8 import configure_stdout_utf8
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -51,7 +40,7 @@ def main(argv: list[str] | None = None) -> int:
     )
     args = parser.parse_args(argv)
 
-    _configure_stdout_utf8()
+    configure_stdout_utf8()
 
     try:
         embedder = LocalSentenceTransformerEmbedder(args.model_name)

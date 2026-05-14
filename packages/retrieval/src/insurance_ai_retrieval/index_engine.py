@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import json
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
@@ -10,7 +10,7 @@ import numpy as np
 
 from insurance_ai_retrieval.chunks_io import flatten_chunks_sorted, load_chunk_artifacts_from_dir
 from insurance_ai_retrieval.embedder import PassageEmbedder
-from insurance_ai_retrieval.metadata import ChunkMetadataRecord
+from insurance_ai_retrieval.metadata import ChunkMetadataRecord, enrich_chunk_metadata
 
 EMBEDDINGS_FILENAME = "chunk_embeddings.npy"
 METADATA_FILENAME = "chunk_metadata.jsonl"
@@ -53,6 +53,67 @@ class SearchHit:
     rank: int
     score: float
     metadata: ChunkMetadataRecord
+
+
+DEFAULT_EXCLUDED_SECTION_TYPES: frozenset[str] = frozenset({"toc", "cover", "guide", "summary"})
+
+
+@dataclass
+class SearchFilters:
+    """Optional metadata / section-type gates applied before ranking."""
+
+    document_id: str | None = None
+    insurer: str | None = None
+    product_type: str | None = None
+    product_name: str | None = None
+    policy_unit_name: str | None = None
+    variant_name: str | None = None
+    include_section_types: frozenset[str] | None = None
+    exclude_section_types: frozenset[str] = field(default_factory=frozenset)
+    use_default_section_type_excludes: bool = True
+
+
+def _section_type_allowed(section_type: str, filters: SearchFilters) -> bool:
+    if filters.include_section_types is not None:
+        if section_type not in filters.include_section_types:
+            return False
+    elif filters.use_default_section_type_excludes:
+        if section_type in DEFAULT_EXCLUDED_SECTION_TYPES:
+            return False
+    if filters.exclude_section_types and section_type in filters.exclude_section_types:
+        return False
+    return True
+
+
+def _metadata_matches(row: ChunkMetadataRecord, filters: SearchFilters) -> bool:
+    enriched = enrich_chunk_metadata(row)
+    if filters.document_id is not None and enriched.document_id != filters.document_id:
+        return False
+    if filters.insurer is not None:
+        if enriched.insurer is None or enriched.insurer.casefold() != filters.insurer.casefold():
+            return False
+    if filters.product_type is not None:
+        if (
+            enriched.product_type is None
+            or enriched.product_type.casefold() != filters.product_type.casefold()
+        ):
+            return False
+    if filters.product_name is not None:
+        needle = filters.product_name.casefold()
+        hay = (enriched.product_name or "").casefold()
+        if needle not in hay:
+            return False
+    if filters.policy_unit_name is not None:
+        if enriched.policy_unit_name is None:
+            return False
+        if filters.policy_unit_name.casefold() not in enriched.policy_unit_name.casefold():
+            return False
+    if filters.variant_name is not None:
+        if enriched.variant_name is None:
+            return False
+        if filters.variant_name.casefold() not in enriched.variant_name.casefold():
+            return False
+    return True
 
 
 def _write_jsonl(path: Path, records: list[ChunkMetadataRecord]) -> None:
@@ -151,6 +212,8 @@ def search_local_index(
     query: str,
     embedder: PassageEmbedder,
     top_k: int,
+    filters: SearchFilters | None = None,
+    dedupe_section: bool = False,
 ) -> list[SearchHit]:
     """Cosine similarity via dot product on L2-normalized rows (see ``build_local_index``)."""
     cfg = load_index_config(index_dir)
@@ -172,15 +235,35 @@ def search_local_index(
         msg = f"query embedding dim {q.shape} != index dim {cfg.embedding_dim}"
         raise ValueError(msg)
 
+    active_filters = filters or SearchFilters()
+
+    eligible_indices: list[int] = []
+    for i, row in enumerate(meta):
+        if not _section_type_allowed(row.section_type, active_filters):
+            continue
+        if not _metadata_matches(row, active_filters):
+            continue
+        eligible_indices.append(i)
+
+    if not eligible_indices:
+        msg = "no chunks matched metadata and section filters; widen filters or rebuild the index"
+        raise ValueError(msg)
+
     scores = matrix @ q
-    k = max(1, min(top_k, len(scores)))
-    if len(scores) <= k:
-        idx = np.argsort(-scores)
-    else:
-        part = np.argpartition(-scores, k - 1)[:k]
-        idx = part[np.argsort(-scores[part])]
+    eligible_indices.sort(key=lambda idx: float(scores[idx]), reverse=True)
 
     hits: list[SearchHit] = []
-    for rank, i in enumerate(idx.tolist(), start=1):
-        hits.append(SearchHit(rank=rank, score=float(scores[i]), metadata=meta[i]))
+    seen_sections: set[str] = set()
+    for i in eligible_indices:
+        enriched = enrich_chunk_metadata(meta[i])
+        if dedupe_section and enriched.section_id in seen_sections:
+            continue
+        if dedupe_section:
+            seen_sections.add(enriched.section_id)
+        hits.append(
+            SearchHit(rank=len(hits) + 1, score=float(scores[i]), metadata=enriched),
+        )
+        if len(hits) >= top_k:
+            break
+
     return hits

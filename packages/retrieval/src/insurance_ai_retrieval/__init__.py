@@ -5,6 +5,7 @@ from insurance_ai_retrieval.e5_text import format_e5_passage, format_e5_query
 from insurance_ai_retrieval.embedder import LocalSentenceTransformerEmbedder, PassageEmbedder
 from insurance_ai_retrieval.index_engine import (
     IndexConfig,
+    SearchFilters,
     SearchHit,
     build_local_index,
     load_embeddings_matrix,
@@ -19,6 +20,7 @@ __all__ = [
     "IndexConfig",
     "LocalSentenceTransformerEmbedder",
     "PassageEmbedder",
+    "SearchFilters",
     "SearchHit",
     "build_local_index",
     "flatten_chunks_sorted",

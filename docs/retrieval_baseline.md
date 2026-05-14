@@ -54,10 +54,90 @@ Outputs (all under `data/processed/index/`, gitignored except `.gitkeep`):
 | File | Role |
 |------|------|
 | `chunk_embeddings.npy` | `float32` matrix `(num_chunks, dim)` |
-| `chunk_metadata.jsonl` | One JSON object per line (citation + `text`) |
+| `chunk_metadata.jsonl` | One JSON object per line (citation + `text` + derived insurer/product fields) |
 | `index_config.json` | Model id, dimension, counts, timestamps |
 
 ## Search (retrieval-only)
+
+Dense similarity is computed over the **full embedding matrix**, then **metadata and section-type filters** narrow candidates **before** top‑`k` ranking. Natural-language queries that only mention an insurer/product in Korean can still retrieve **boilerplate-similar** clauses from other PDFs (for example identical “청약의 철회” articles). For **repeatable smoke tests** on a multi-insurer corpus, combine a short factual query with **explicit metadata filters** derived from `document_id` / manifest slugs.
+
+### Default section-type filter
+
+Unless you pass `--no-default-section-type-filter`, `search_index` **drops** chunks whose `section_type` is one of:
+
+- `toc`
+- `cover`
+- `guide`
+- `summary`
+
+Use `--include-section-types article,appendix` (comma list) to **whitelist** types instead; that implies the default exclude list is **not** applied. You can still add extra removals with `--exclude-section-types …`.
+
+### Metadata filters (`search_index`)
+
+Optional flags (all combined with **AND** semantics):
+
+- `--document-id`
+- `--insurer` (slug parsed from `document_id`, for example `kyobolife`)
+- `--product-type` (slug parsed from `document_id`, for example `annuity`)
+- `--product-name` (case-insensitive substring match on the derived slug-as-spaces label)
+- `--policy-unit-name`, `--variant-name` (case-insensitive substring matches on chunk fields when present)
+
+If filters remove **every** chunk, the CLI exits with a clear error (`no chunks matched metadata and section filters`).
+
+### Section deduplication
+
+`--dedupe-section` returns **at most one** hit per `section_id` (the highest-scoring chunk in that section). Default is **off**; turn it on for smoke runs where long sections would otherwise fill the entire top‑`k`.
+
+### Example: Kyobo annuity (적립형)
+
+```bash
+uv run python -m insurance_ai_retrieval.search_index \
+  --index-dir data/processed/index \
+  --insurer kyobolife \
+  --product-type annuity \
+  --variant-name 적립형 \
+  --query "보험금 지급이 늦어지면 이자는 어떻게 계산돼?" \
+  --top-k 5 \
+  --dedupe-section
+```
+
+### Example: Samsung cancer
+
+```bash
+uv run python -m insurance_ai_retrieval.search_index \
+  --index-dir data/processed/index \
+  --insurer samsunglife \
+  --product-type cancer \
+  --query "암 진단 보험금 지급 사유는 뭐야?" \
+  --top-k 5 \
+  --dedupe-section
+```
+
+### Example: Samsung whole life
+
+```bash
+uv run python -m insurance_ai_retrieval.search_index \
+  --index-dir data/processed/index \
+  --insurer samsunglife \
+  --product-type whole_life \
+  --query "해약환급금은 어떻게 지급돼?" \
+  --top-k 5 \
+  --dedupe-section
+```
+
+### Example: Mirae Asset variable annuity
+
+```bash
+uv run python -m insurance_ai_retrieval.search_index \
+  --index-dir data/processed/index \
+  --insurer miraeassetlife \
+  --product-type variable_annuity \
+  --query "특별계정 운용은 어떻게 설명돼?" \
+  --top-k 5 \
+  --dedupe-section
+```
+
+### Unfiltered search (exploratory)
 
 ```bash
 uv run python -m insurance_ai_retrieval.search_index \
@@ -66,21 +146,21 @@ uv run python -m insurance_ai_retrieval.search_index \
   --top-k 5
 ```
 
-The CLI prints rank, similarity score, identifiers, section title/type, product metadata, page span, character span, and a short text preview. **Inspect** titles and metadata only; there is no “correct answer” assertion in this baseline.
+The CLI prints rank, similarity score, identifiers, **insurer / product_type / product_name** (when known), section title/type, policy-unit fields, page span, character span, and a short text preview. **Inspect** titles and metadata only; there is no “correct answer” assertion in this baseline.
 
 ### Multi-insurer corpus: scope your queries
 
 The default manual corpus can include **multiple insurers and products** at once (for example Kyobo Life annuity, Samsung Life cancer / whole life, Mirae Asset Life variable annuity). **Generic** questions (“청약 철회는 언제까지 가능해?”, “해약환급금은 어떻게 지급돼?”) often match **valid** clauses in **more than one** policy, so top‑`k` hits may jump between documents. That is fine for **exploratory** search, but it makes **repeatable smoke tests** hard to judge.
 
-**Prefer insurer/product-scoped queries** when you want a stable bar for retrieval quality: repeat the same query after pipeline or model changes and check whether the intended document still dominates the hit list.
+**Prefer metadata filters plus a short factual query** when you want a stable bar for retrieval quality: repeat the same command after pipeline or model changes and check whether the intended `document_id` still dominates the hit list.
 
 - **Generic queries** are allowed for exploratory search across the whole index.
-- **Scoped queries** (insurer + product name or unmistakable product phrasing from the PDF/manifest) are better for **repeatable evaluation** and smoke checks.
-- **Expected results** should be judged using **`section_title`**, **`section_type`**, **insurer/product metadata** on the hit (`policy_unit_name`, `variant_name`, manifest-aligned labels when present), and **page range** (`page_start`–`page_end`), not by asking the CLI for a prose “answer.”
+- **Scoped natural-language queries** help, but they are **not sufficient** when many policies share the same article titles or appendix tables.
+- **Expected results** should be judged using **`section_title`**, **`section_type`**, **`insurer` / `product_type` / `product_name`**, **`policy_unit_name`**, **`variant_name`**, and **page range** (`page_start`–`page_end`), not by asking the CLI for a prose “answer.”
 
 ### Smoke-style queries (insurer / product scoped)
 
-Use the same `search_index` command with different `--query` strings. Examples below align with the products in `data/manifests/manual.yaml`; adjust wording if your local manifest differs.
+Use the same `search_index` command with different `--query` strings (and matching `--insurer` / `--product-type` filters). Examples below align with the products in `data/manifests/manual.yaml`; adjust wording if your local manifest differs.
 
 **Kyobo Life — 개인연금저축 교보로연금보험 적립형**
 
@@ -129,9 +209,12 @@ Helpers live in `insurance_ai_retrieval.e5_text` so formatting stays in one plac
 Each hit is backed by a `ChunkMetadataRecord` (mirroring `DocumentChunk` fields needed for future citations):
 
 - `chunk_id`, `section_id`, `section_title`, `section_type`, `document_id`
+- `insurer`, `product_type`, `product_name` (parsed from `document_id` when the canonical filename pattern matches)
 - `policy_unit_id`, `policy_unit_name`, `variant_name`
 - `page_start`, `page_end`, `char_start`, `char_end`
 - `text` (full chunk body in JSONL for re-display / snippets)
+
+Older `chunk_metadata.jsonl` rows without the new fields are **enriched at search time** from `document_id`, but **rebuilding the index** after upgrading packages repopulates JSONL eagerly.
 
 ## Known limitations
 
@@ -139,7 +222,7 @@ Each hit is backed by a `ChunkMetadataRecord` (mirroring `DocumentChunk` fields 
 - **No reranking** beyond raw cosine similarity.
 - **No cross-reference expansion** across articles.
 - **No generated answers**; downstream LLM use is a separate phase.
-- **Windows console**: if Korean output garbles, set `PYTHONIOENCODING=utf-8` for the shell session.
+- **Windows console**: if Korean output garbles, set `PYTHONIOENCODING=utf-8` for the shell session (chunking CLIs also call a best-effort UTF‑8 stdout configure helper).
 
 ## Why retrieval before full RAG
 

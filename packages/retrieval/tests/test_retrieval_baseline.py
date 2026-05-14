@@ -9,12 +9,13 @@ import pytest
 from insurance_ai_retrieval.chunks_io import flatten_chunks_sorted, load_chunk_artifacts_from_dir
 from insurance_ai_retrieval.e5_text import format_e5_passage, format_e5_query
 from insurance_ai_retrieval.index_engine import (
+    SearchFilters,
     build_local_index,
     load_index_config,
     load_metadata_rows,
     search_local_index,
 )
-from insurance_ai_retrieval.metadata import ChunkMetadataRecord
+from insurance_ai_retrieval.metadata import ChunkMetadataRecord, enrich_chunk_metadata
 from insurance_ai_shared.models.chunk import ChunkingConfig, DocumentChunk, DocumentChunksArtifact
 
 
@@ -142,11 +143,16 @@ def test_flatten_chunks_sorted_order() -> None:
 
 
 def test_chunk_metadata_record_from_document_chunk() -> None:
-    ch = _chunk()
+    ch = _chunk(
+        document_id="kyobolife_annuity_kyobo_ro_annuity_insurance_policy_terms_20260101_080b9e62",
+    )
     row = ChunkMetadataRecord.from_document_chunk(ch)
     assert row.chunk_id == ch.chunk_id
     assert row.section_id == ch.section_id
     assert row.policy_unit_id is ch.policy_unit_id
+    assert row.insurer == "kyobolife"
+    assert row.product_type == "annuity"
+    assert row.product_name == "kyobo ro annuity insurance"
 
 
 def test_e5_query_and_passage_format_helpers() -> None:
@@ -218,15 +224,16 @@ def test_search_result_includes_citation_fields(tmp_path: Path) -> None:
     chunks_dir = tmp_path / "chunks"
     index_dir = tmp_path / "index"
     chunks_dir.mkdir()
+    doc_id = "kyobolife_annuity_kyobo_ro_annuity_insurance_policy_terms_20260101_080b9e62"
     ch = _chunk(
-        document_id="doc_c",
-        chunk_id="doc_c::chunk::0000::000",
-        policy_unit_id="doc_c::pu::1",
+        document_id=doc_id,
+        chunk_id=f"{doc_id}::chunk::0000::000",
+        policy_unit_id=f"{doc_id}::pu::1",
         variant_name="적립형",
         policy_unit_name="상품",
     )
-    art = _artifact(document_id="doc_c", chunks=[ch])
-    (chunks_dir / "doc_c.chunks.json").write_text(art.model_dump_json(), encoding="utf-8")
+    art = _artifact(document_id=doc_id, chunks=[ch])
+    (chunks_dir / f"{doc_id}.chunks.json").write_text(art.model_dump_json(), encoding="utf-8")
     emb = FakeEmbedder()
     build_local_index(chunks_dir=chunks_dir, index_dir=index_dir, embedder=emb, batch_size=8)
     hits = search_local_index(index_dir=index_dir, query="q", embedder=emb, top_k=1)
@@ -235,6 +242,8 @@ def test_search_result_includes_citation_fields(tmp_path: Path) -> None:
     assert m.section_title == ch.section_title
     assert m.section_type == ch.section_type
     assert m.document_id == ch.document_id
+    assert m.insurer == "kyobolife"
+    assert m.product_type == "annuity"
     assert m.policy_unit_id == ch.policy_unit_id
     assert m.variant_name == ch.variant_name
     assert m.page_start == ch.page_start
@@ -286,3 +295,272 @@ def test_load_index_config_roundtrip(tmp_path: Path) -> None:
     assert cfg.backend == "numpy_normalized_dot"
     rows = load_metadata_rows(index_dir)
     assert len(rows) == 1
+
+
+def test_default_section_filters_exclude_toc(tmp_path: Path) -> None:
+    chunks_dir = tmp_path / "chunks"
+    index_dir = tmp_path / "index"
+    chunks_dir.mkdir()
+    doc_id = "kyobolife_annuity_kyobo_ro_annuity_insurance_policy_terms_20260101_080b9e62"
+    toc = _chunk(
+        document_id=doc_id,
+        chunk_id=f"{doc_id}::chunk::toc::000",
+        section_id=f"{doc_id}::sec::toc",
+        section_type="toc",
+        text="alpha toc only",
+    )
+    body = _chunk(
+        document_id=doc_id,
+        chunk_id=f"{doc_id}::chunk::body::000",
+        section_id=f"{doc_id}::sec::body",
+        section_type="article",
+        text="alpha article body",
+    )
+    art = _artifact(document_id=doc_id, chunks=[toc, body])
+    (chunks_dir / f"{doc_id}.chunks.json").write_text(art.model_dump_json(), encoding="utf-8")
+    emb = FakeEmbedder()
+    build_local_index(chunks_dir=chunks_dir, index_dir=index_dir, embedder=emb, batch_size=8)
+    hits = search_local_index(index_dir=index_dir, query="alpha", embedder=emb, top_k=5)
+    assert hits
+    assert all(h.metadata.section_type != "toc" for h in hits)
+
+
+def test_search_filters_by_insurer_and_product_type(tmp_path: Path) -> None:
+    chunks_dir = tmp_path / "chunks"
+    index_dir = tmp_path / "index"
+    chunks_dir.mkdir()
+    kyobo = "kyobolife_annuity_kyobo_ro_annuity_insurance_policy_terms_20260101_080b9e62"
+    cancer = "samsunglife_cancer_internet_cancer_insurance_policy_terms_20260101_39af0c18"
+    k_chunk = _chunk(
+        document_id=kyobo,
+        chunk_id=f"{kyobo}::chunk::0000::000",
+        section_id=f"{kyobo}::sec::0000",
+        text="청약 철회",
+    )
+    s_chunk = _chunk(
+        document_id=cancer,
+        chunk_id=f"{cancer}::chunk::0000::000",
+        section_id=f"{cancer}::sec::0000",
+        text="청약 철회",
+    )
+    (chunks_dir / f"{kyobo}.chunks.json").write_text(
+        _artifact(document_id=kyobo, chunks=[k_chunk]).model_dump_json(),
+        encoding="utf-8",
+    )
+    (chunks_dir / f"{cancer}.chunks.json").write_text(
+        _artifact(document_id=cancer, chunks=[s_chunk]).model_dump_json(),
+        encoding="utf-8",
+    )
+    emb = FakeEmbedder()
+    build_local_index(chunks_dir=chunks_dir, index_dir=index_dir, embedder=emb, batch_size=8)
+    hits = search_local_index(
+        index_dir=index_dir,
+        query="청약 철회",
+        embedder=emb,
+        top_k=5,
+        filters=SearchFilters(insurer="kyobolife", product_type="annuity"),
+    )
+    assert len(hits) == 1
+    assert hits[0].metadata.document_id == kyobo
+
+
+def test_search_filters_by_document_id(tmp_path: Path) -> None:
+    chunks_dir = tmp_path / "chunks"
+    index_dir = tmp_path / "index"
+    chunks_dir.mkdir()
+    doc_id = "samsunglife_whole_life_balance_whole_life_insurance_policy_terms_20260301_1699395d"
+    a = _chunk(
+        document_id=doc_id,
+        chunk_id=f"{doc_id}::chunk::0000::000",
+        section_id=f"{doc_id}::sec::0000",
+        text="해약환급금",
+    )
+    b = _chunk(
+        document_id=doc_id,
+        chunk_id=f"{doc_id}::chunk::0001::000",
+        section_id=f"{doc_id}::sec::0001",
+        text="other",
+    )
+    art = _artifact(document_id=doc_id, chunks=[a, b])
+    (chunks_dir / f"{doc_id}.chunks.json").write_text(art.model_dump_json(), encoding="utf-8")
+    emb = FakeEmbedder()
+    build_local_index(chunks_dir=chunks_dir, index_dir=index_dir, embedder=emb, batch_size=8)
+    hits = search_local_index(
+        index_dir=index_dir,
+        query="해약환급금",
+        embedder=emb,
+        top_k=5,
+        filters=SearchFilters(document_id=doc_id),
+    )
+    assert {h.metadata.chunk_id for h in hits} == {a.chunk_id, b.chunk_id}
+
+
+def test_search_filters_by_product_name_substring(tmp_path: Path) -> None:
+    chunks_dir = tmp_path / "chunks"
+    index_dir = tmp_path / "index"
+    chunks_dir.mkdir()
+    doc_id = "samsunglife_cancer_internet_cancer_insurance_policy_terms_20260101_39af0c18"
+    ch = _chunk(
+        document_id=doc_id,
+        chunk_id=f"{doc_id}::chunk::0000::000",
+        section_id=f"{doc_id}::sec::0000",
+        text="암",
+    )
+    art = _artifact(document_id=doc_id, chunks=[ch])
+    (chunks_dir / f"{doc_id}.chunks.json").write_text(art.model_dump_json(), encoding="utf-8")
+    emb = FakeEmbedder()
+    build_local_index(chunks_dir=chunks_dir, index_dir=index_dir, embedder=emb, batch_size=8)
+    hits = search_local_index(
+        index_dir=index_dir,
+        query="암",
+        embedder=emb,
+        top_k=5,
+        filters=SearchFilters(product_name="internet"),
+    )
+    assert len(hits) == 1
+
+
+def test_search_filters_by_variant_name(tmp_path: Path) -> None:
+    chunks_dir = tmp_path / "chunks"
+    index_dir = tmp_path / "index"
+    chunks_dir.mkdir()
+    doc_id = "kyobolife_annuity_kyobo_ro_annuity_insurance_policy_terms_20260101_080b9e62"
+    match = _chunk(
+        document_id=doc_id,
+        chunk_id=f"{doc_id}::chunk::0000::000",
+        section_id=f"{doc_id}::sec::0000",
+        variant_name="적립형",
+        text="보험금",
+    )
+    miss = _chunk(
+        document_id=doc_id,
+        chunk_id=f"{doc_id}::chunk::0001::000",
+        section_id=f"{doc_id}::sec::0001",
+        variant_name="즉시형",
+        text="보험금",
+    )
+    art = _artifact(document_id=doc_id, chunks=[match, miss])
+    (chunks_dir / f"{doc_id}.chunks.json").write_text(art.model_dump_json(), encoding="utf-8")
+    emb = FakeEmbedder()
+    build_local_index(chunks_dir=chunks_dir, index_dir=index_dir, embedder=emb, batch_size=8)
+    hits = search_local_index(
+        index_dir=index_dir,
+        query="보험금",
+        embedder=emb,
+        top_k=5,
+        filters=SearchFilters(variant_name="적립"),
+    )
+    assert len(hits) == 1
+    assert hits[0].metadata.variant_name == "적립형"
+
+
+def test_search_empty_filtered_candidates_raises(tmp_path: Path) -> None:
+    chunks_dir = tmp_path / "chunks"
+    index_dir = tmp_path / "index"
+    chunks_dir.mkdir()
+    doc_id = "kyobolife_annuity_kyobo_ro_annuity_insurance_policy_terms_20260101_080b9e62"
+    ch = _chunk(
+        document_id=doc_id,
+        chunk_id=f"{doc_id}::chunk::0000::000",
+        section_id=f"{doc_id}::sec::0000",
+        text="x",
+    )
+    art = _artifact(document_id=doc_id, chunks=[ch])
+    (chunks_dir / f"{doc_id}.chunks.json").write_text(art.model_dump_json(), encoding="utf-8")
+    emb = FakeEmbedder()
+    build_local_index(chunks_dir=chunks_dir, index_dir=index_dir, embedder=emb, batch_size=8)
+    with pytest.raises(ValueError, match="no chunks matched metadata and section filters"):
+        search_local_index(
+            index_dir=index_dir,
+            query="x",
+            embedder=emb,
+            top_k=5,
+            filters=SearchFilters(insurer="not_a_real_insurer"),
+        )
+
+
+def test_dedupe_section_returns_one_chunk_per_section(tmp_path: Path) -> None:
+    chunks_dir = tmp_path / "chunks"
+    index_dir = tmp_path / "index"
+    chunks_dir.mkdir()
+    doc_id = (
+        "miraeassetlife_variable_annuity_variable_annuity_insurance_policy_terms_20260401_76283b26"
+    )
+    sec = f"{doc_id}::sec::dup"
+    first = _chunk(
+        document_id=doc_id,
+        chunk_id=f"{doc_id}::chunk::0000::000",
+        section_id=sec,
+        text="dup section chunk a",
+        char_start=0,
+        char_end=10,
+    )
+    second = _chunk(
+        document_id=doc_id,
+        chunk_id=f"{doc_id}::chunk::0000::001",
+        section_id=sec,
+        text="dup section chunk b",
+        char_start=11,
+        char_end=22,
+        chunk_index=1,
+    )
+    art = _artifact(document_id=doc_id, chunks=[first, second])
+    (chunks_dir / f"{doc_id}.chunks.json").write_text(art.model_dump_json(), encoding="utf-8")
+    emb = FakeEmbedder()
+    build_local_index(chunks_dir=chunks_dir, index_dir=index_dir, embedder=emb, batch_size=8)
+    hits = search_local_index(
+        index_dir=index_dir,
+        query="dup",
+        embedder=emb,
+        top_k=5,
+        dedupe_section=True,
+    )
+    assert len(hits) == 1
+
+
+def test_exclude_section_types_removes_matches(tmp_path: Path) -> None:
+    chunks_dir = tmp_path / "chunks"
+    index_dir = tmp_path / "index"
+    chunks_dir.mkdir()
+    doc_id = "kyobolife_annuity_kyobo_ro_annuity_insurance_policy_terms_20260101_080b9e62"
+    appendix = _chunk(
+        document_id=doc_id,
+        chunk_id=f"{doc_id}::chunk::apx::000",
+        section_id=f"{doc_id}::sec::apx",
+        section_type="appendix",
+        text="target text",
+    )
+    article = _chunk(
+        document_id=doc_id,
+        chunk_id=f"{doc_id}::chunk::art::000",
+        section_id=f"{doc_id}::sec::art",
+        section_type="article",
+        text="other",
+    )
+    art = _artifact(document_id=doc_id, chunks=[appendix, article])
+    (chunks_dir / f"{doc_id}.chunks.json").write_text(art.model_dump_json(), encoding="utf-8")
+    emb = FakeEmbedder()
+    build_local_index(chunks_dir=chunks_dir, index_dir=index_dir, embedder=emb, batch_size=8)
+    hits = search_local_index(
+        index_dir=index_dir,
+        query="target",
+        embedder=emb,
+        top_k=5,
+        filters=SearchFilters(
+            use_default_section_type_excludes=False,
+            exclude_section_types=frozenset({"appendix"}),
+        ),
+    )
+    assert len(hits) == 1
+    assert hits[0].metadata.section_type == "article"
+
+
+def test_enrich_chunk_metadata_restores_derivation_from_document_id() -> None:
+    doc_id = "kyobolife_annuity_kyobo_ro_annuity_insurance_policy_terms_20260101_080b9e62"
+    ch = _chunk(document_id=doc_id)
+    base = ChunkMetadataRecord.from_document_chunk(ch)
+    legacy = base.model_copy(update={"insurer": None, "product_type": None, "product_name": None})
+    restored = enrich_chunk_metadata(legacy)
+    assert restored.insurer == "kyobolife"
+    assert restored.product_type == "annuity"
+    assert restored.product_name == "kyobo ro annuity insurance"

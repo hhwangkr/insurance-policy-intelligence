@@ -207,13 +207,17 @@ uv run python -m insurance_ai_retrieval.build_index \
   --index-dir data/processed/index
 ```
 
-**I. Search (insurer/product-scoped smoke example)**
+**I. Search (metadata-scoped smoke example)**
 
 ```bash
 uv run python -m insurance_ai_retrieval.search_index \
   --index-dir data/processed/index \
-  --query "교보생명 개인연금저축 교보로연금보험 적립형에서 보험금 지급이 늦어지면 이자는 어떻게 계산돼?" \
-  --top-k 5
+  --insurer kyobolife \
+  --product-type annuity \
+  --variant-name 적립형 \
+  --query "보험금 지급이 늦어지면 이자는 어떻게 계산돼?" \
+  --top-k 5 \
+  --dedupe-section
 ```
 
 More scoped smoke examples and evaluation notes: [`docs/retrieval_baseline.md`](docs/retrieval_baseline.md).

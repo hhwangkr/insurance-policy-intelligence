@@ -13,6 +13,14 @@ from insurance_ai_ingestion.section_chunking import (
 )
 from insurance_ai_shared.models.chunk import ChunkingConfig, DocumentChunksArtifact
 from insurance_ai_shared.models.section import DocumentSectionsArtifact
+from insurance_ai_shared.stdio_utf8 import configure_stdout_utf8
+
+__all__ = [
+    "chunks_json_path",
+    "configure_stdout_utf8",
+    "load_sections_artifacts",
+    "main",
+]
 
 
 def chunks_json_path(*, output_dir: Path, document_id: str) -> Path:
@@ -65,6 +73,7 @@ def main(argv: list[str] | None = None) -> int:
         help="Overlap between consecutive chunks within the same section (default: 250).",
     )
     args = parser.parse_args(argv)
+    configure_stdout_utf8()
 
     try:
         sections_artifacts = load_sections_artifacts(input_dir=args.input_dir)
