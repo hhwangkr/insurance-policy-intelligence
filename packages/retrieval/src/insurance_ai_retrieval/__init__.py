@@ -17,6 +17,12 @@ from insurance_ai_retrieval.citation_context import (
 )
 from insurance_ai_retrieval.e5_text import format_e5_passage, format_e5_query
 from insurance_ai_retrieval.embedder import LocalSentenceTransformerEmbedder, PassageEmbedder
+from insurance_ai_retrieval.grounded_answer import (
+    GroundedAnswer,
+    GroundedAnswerValidation,
+    extract_citation_ids_from_text,
+    validate_answer_citations,
+)
 from insurance_ai_retrieval.index_engine import (
     IndexConfig,
     SearchFilters,
@@ -37,13 +43,16 @@ __all__ = [
     "IndexConfig",
     "LocalSentenceTransformerEmbedder",
     "PassageEmbedder",
+    "GroundedAnswer",
     "GroundedAnswerPrompt",
+    "GroundedAnswerValidation",
     "SearchFilters",
     "SearchHit",
     "build_citation_context",
     "build_grounded_answer_prompt",
     "build_local_index",
     "citation_bundle_from_hits",
+    "extract_citation_ids_from_text",
     "flatten_chunks_sorted",
     "format_citation_bundle_json",
     "format_grounded_answer_prompt_json",
@@ -55,4 +64,5 @@ __all__ = [
     "load_metadata_rows",
     "search_filters_to_mapping",
     "search_local_index",
+    "validate_answer_citations",
 ]

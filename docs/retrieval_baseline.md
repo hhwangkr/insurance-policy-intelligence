@@ -262,6 +262,12 @@ For **reproducible inspection** or **manual QA**, you may optionally save a bund
 
 **Do not** treat “save context JSON → `build_answer_prompt`” as the production architecture; it mirrors the same `CitationContextBundle` → `build_grounded_answer_prompt` logic you would call in process memory in step 3 above.
 
+### Grounded answer schema and citation validation (Phase 2H-1, no LLM)
+
+`insurance_ai_retrieval.grounded_answer` defines a small **`GroundedAnswer`** model (prose + `citations_used` + `insufficient_context`) and **`validate_answer_citations`** / **`extract_citation_ids_from_text`** to detect invented `[C…]` markers, mismatches between body and `citations_used`, and empty or uncited answers when the model claims sufficient context. Use this **before or after** a future LLM call to guard rails—still **no LLM** and no provider SDKs in that module.
+
+## Known limitations
+
 - **Embedding quality** depends on the chosen model and chunk text (Korean layout quirks, OCR noise).
 - **No reranking** beyond raw cosine similarity.
 - **No cross-reference expansion** across articles.
