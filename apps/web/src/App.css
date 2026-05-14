@@ -82,6 +82,26 @@ body {
   border-radius: 4px;
 }
 
+.sidebar__hint--loading {
+  color: #1e5a96;
+  font-style: italic;
+}
+
+.sidebar__warning {
+  margin: 0 0 0.5rem;
+  padding: 0.4rem 0.45rem;
+  font-size: 0.7rem;
+  line-height: 1.35;
+  color: #92400e;
+  background: #fffbeb;
+  border: 1px solid #fcd34d;
+  border-radius: 6px;
+}
+
+.field-select {
+  cursor: pointer;
+}
+
 .field {
   display: flex;
   flex-direction: column;
@@ -119,6 +139,8 @@ body {
 
 .field input[type="text"],
 .field input[type="number"],
+.field select,
+.field-select,
 .query-textarea {
   font: inherit;
   font-size: 0.82rem;
@@ -131,6 +153,8 @@ body {
 
 .field input[type="text"]:focus,
 .field input[type="number"]:focus,
+.field select:focus,
+.field-select:focus,
 .query-textarea:focus {
   outline: 2px solid #c5d6ec;
   outline-offset: 0;

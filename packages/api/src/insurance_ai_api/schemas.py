@@ -69,3 +69,15 @@ class RetrievalContextRequest(BaseModel):
 
     def resolved_index_dir(self) -> Path:
         return Path(self.index_dir).expanduser()
+
+
+class RetrievalOptionsResponse(BaseModel):
+    """GET ``/retrieval/options`` — unique metadata values from ``chunk_metadata.jsonl``."""
+
+    model_config = ConfigDict(str_strip_whitespace=True)
+
+    insurers: list[str] = Field(default_factory=list)
+    product_types: list[str] = Field(default_factory=list)
+    product_names: list[str] = Field(default_factory=list)
+    variant_names: list[str] = Field(default_factory=list)
+    policy_unit_names: list[str] = Field(default_factory=list)

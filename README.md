@@ -92,10 +92,13 @@ Cases live in [`data/eval/retrieval_queries.yaml`](data/eval/retrieval_queries.y
 uv run uvicorn insurance_ai_api.main:app --reload --host 127.0.0.1 --port 8765
 ```
 
-**Endpoint:** `POST /retrieval/context`  
-**Health:** `GET /health`
+| Method | Path | Role |
+|--------|------|------|
+| `GET` | `/health` | Liveness |
+| `GET` | `/retrieval/options` | Unique `insurer` / `product_type` / `variant_name` / … values from `chunk_metadata.jsonl` (query `index_dir`, default `data/processed/index`) for UIs |
+| `POST` | `/retrieval/context` | Citation-ready bundle for a query |
 
-Example JSON body (matches the web UI default scope):
+Example JSON body for **`POST /retrieval/context`** (typical web UI scope):
 
 ```json
 {
@@ -123,7 +126,7 @@ Invalid input → **400**; missing index → **404**; unexpected failure → **5
 
 ## Evidence Search (Web UI)
 
-**`apps/web`** — **Insurance Policy Evidence Search**: calls **`POST /retrieval/context`**, shows citation cards and a **collapsed-by-default** raw JSON panel. The UI **defaults to `http://127.0.0.1:8765`** (no API URL in the main sidebar). Set **`VITE_API_BASE_URL`** at dev/build time if needed (copy `apps/web/.env.example` → `apps/web/.env`); a temporary override also lives under **Advanced** in the app.
+**`apps/web`** — **Insurance Policy Evidence Search**: calls **`GET /retrieval/options`** to populate **insurer / product_type / variant_name** dropdowns from the current index, then **`POST /retrieval/context`** for results; **collapsed-by-default** raw JSON. The UI **defaults to `http://127.0.0.1:8765`** (no API URL in the main sidebar). Set **`VITE_API_BASE_URL`** at dev/build time if needed (copy `apps/web/.env.example` → `apps/web/.env`); a temporary override also lives under **Advanced** in the app.
 
 ```bash
 cd apps/web

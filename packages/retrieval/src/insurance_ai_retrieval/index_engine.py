@@ -213,6 +213,38 @@ def load_metadata_rows(index_dir: Path) -> list[ChunkMetadataRecord]:
     return _read_jsonl(path)
 
 
+def collect_index_filter_options(index_dir: Path) -> dict[str, list[str]]:
+    """Return sorted unique non-empty metadata values from the index (for filter UIs).
+
+    Reads ``chunk_metadata.jsonl`` via :func:`load_metadata_rows` (same file as search).
+    """
+    meta = load_metadata_rows(index_dir)
+    insurers: set[str] = set()
+    product_types: set[str] = set()
+    product_names: set[str] = set()
+    variant_names: set[str] = set()
+    policy_unit_names: set[str] = set()
+    for row in meta:
+        rec = enrich_chunk_metadata(row)
+        if rec.insurer:
+            insurers.add(rec.insurer)
+        if rec.product_type:
+            product_types.add(rec.product_type)
+        if rec.product_name:
+            product_names.add(rec.product_name)
+        if rec.variant_name:
+            variant_names.add(rec.variant_name)
+        if rec.policy_unit_name:
+            policy_unit_names.add(rec.policy_unit_name)
+    return {
+        "insurers": sorted(insurers),
+        "product_types": sorted(product_types),
+        "product_names": sorted(product_names),
+        "variant_names": sorted(variant_names),
+        "policy_unit_names": sorted(policy_unit_names),
+    }
+
+
 def search_local_index(
     *,
     index_dir: Path,

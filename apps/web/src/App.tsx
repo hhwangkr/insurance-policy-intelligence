@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 
 import "./App.css";
 
@@ -29,6 +29,16 @@ type CitationBundle = {
   citations: CitationEntry[];
 };
 
+type RetrievalOptions = {
+  insurers: string[];
+  product_types: string[];
+  product_names: string[];
+  variant_names: string[];
+  policy_unit_names: string[];
+};
+
+type OptionsLoadState = "idle" | "loading" | "ok" | "error";
+
 function normalizeApiBase(raw: string): string {
   return raw.trim().replace(/\/+$/, "");
 }
@@ -49,6 +59,15 @@ function isLikelyFetchNetworkError(e: unknown): boolean {
     return /failed to fetch|networkerror|load failed|network request failed/i.test(e.message);
   }
   return false;
+}
+
+function mergeSortedChoices(current: string, apiList: string[]): string[] {
+  const set = new Set(apiList);
+  const t = current.trim();
+  if (t) {
+    set.add(t);
+  }
+  return Array.from(set).sort((a, b) => a.localeCompare(b));
 }
 
 function CitationCard({ c }: { c: CitationEntry }) {
@@ -106,6 +125,87 @@ export default function App() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [bundle, setBundle] = useState<CitationBundle | null>(null);
+
+  const [retrievalOptions, setRetrievalOptions] = useState<RetrievalOptions | null>(null);
+  const [optionsLoad, setOptionsLoad] = useState<OptionsLoadState>("idle");
+
+  useEffect(() => {
+    if (!indexDir.trim()) {
+      setOptionsLoad("idle");
+      setRetrievalOptions(null);
+      return;
+    }
+    let cancelled = false;
+    setOptionsLoad("loading");
+    const params = new URLSearchParams({ index_dir: indexDir.trim() });
+    const url = `${apiBaseUrl}/retrieval/options?${params.toString()}`;
+    void fetch(url)
+      .then(async (res) => {
+        if (cancelled) {
+          return;
+        }
+        if (!res.ok) {
+          setRetrievalOptions(null);
+          setOptionsLoad("error");
+          return;
+        }
+        let data: unknown;
+        try {
+          data = await res.json();
+        } catch {
+          setRetrievalOptions(null);
+          setOptionsLoad("error");
+          return;
+        }
+        if (cancelled) {
+          return;
+        }
+        const parsed = data as Partial<RetrievalOptions>;
+        if (
+          !Array.isArray(parsed.insurers) ||
+          !Array.isArray(parsed.product_types) ||
+          !Array.isArray(parsed.product_names) ||
+          !Array.isArray(parsed.variant_names) ||
+          !Array.isArray(parsed.policy_unit_names)
+        ) {
+          setRetrievalOptions(null);
+          setOptionsLoad("error");
+          return;
+        }
+        setRetrievalOptions({
+          insurers: parsed.insurers,
+          product_types: parsed.product_types,
+          product_names: parsed.product_names,
+          variant_names: parsed.variant_names,
+          policy_unit_names: parsed.policy_unit_names,
+        });
+        setOptionsLoad("ok");
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setRetrievalOptions(null);
+          setOptionsLoad("error");
+        }
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [apiBaseUrl, indexDir]);
+
+  const insurerChoices = useMemo(
+    () => mergeSortedChoices(insurer, retrievalOptions?.insurers ?? []),
+    [insurer, retrievalOptions],
+  );
+  const productTypeChoices = useMemo(
+    () => mergeSortedChoices(productType, retrievalOptions?.product_types ?? []),
+    [productType, retrievalOptions],
+  );
+  const variantChoices = useMemo(
+    () => mergeSortedChoices(variantName, retrievalOptions?.variant_names ?? []),
+    [variantName, retrievalOptions],
+  );
+
+  const useFilterSelects = optionsLoad === "ok" && retrievalOptions !== null;
 
   const canSearch = useMemo(() => query.trim().length > 0 && indexDir.trim().length > 0, [
     query,
@@ -204,25 +304,78 @@ export default function App() {
 
           <div className="sidebar__block">
             <h2 className="sidebar__heading">Filters</h2>
+            {optionsLoad === "loading" ? (
+              <p className="sidebar__hint sidebar__hint--loading">Loading filter values from index…</p>
+            ) : null}
+            {optionsLoad === "error" ? (
+              <p className="sidebar__warning" role="status">
+                Could not load filter options from the index. Enter values manually.
+              </p>
+            ) : null}
             <label className="field">
               <span className="field__label">insurer</span>
-              <input type="text" value={insurer} onChange={(e) => setInsurer(e.target.value)} />
+              {useFilterSelects ? (
+                <select
+                  className="field-select"
+                  value={insurer}
+                  onChange={(e) => setInsurer(e.target.value)}
+                >
+                  <option value="">Any</option>
+                  {insurerChoices.map((v) => (
+                    <option key={v} value={v}>
+                      {v}
+                    </option>
+                  ))}
+                </select>
+              ) : (
+                <input type="text" value={insurer} onChange={(e) => setInsurer(e.target.value)} />
+              )}
             </label>
             <label className="field">
               <span className="field__label">product_type</span>
-              <input
-                type="text"
-                value={productType}
-                onChange={(e) => setProductType(e.target.value)}
-              />
+              {useFilterSelects ? (
+                <select
+                  className="field-select"
+                  value={productType}
+                  onChange={(e) => setProductType(e.target.value)}
+                >
+                  <option value="">Any</option>
+                  {productTypeChoices.map((v) => (
+                    <option key={v} value={v}>
+                      {v}
+                    </option>
+                  ))}
+                </select>
+              ) : (
+                <input
+                  type="text"
+                  value={productType}
+                  onChange={(e) => setProductType(e.target.value)}
+                />
+              )}
             </label>
             <label className="field">
               <span className="field__label">variant_name</span>
-              <input
-                type="text"
-                value={variantName}
-                onChange={(e) => setVariantName(e.target.value)}
-              />
+              {useFilterSelects ? (
+                <select
+                  className="field-select"
+                  value={variantName}
+                  onChange={(e) => setVariantName(e.target.value)}
+                >
+                  <option value="">Any</option>
+                  {variantChoices.map((v) => (
+                    <option key={v} value={v}>
+                      {v}
+                    </option>
+                  ))}
+                </select>
+              ) : (
+                <input
+                  type="text"
+                  value={variantName}
+                  onChange={(e) => setVariantName(e.target.value)}
+                />
+              )}
             </label>
             <label className="field">
               <span className="field__label">top_k</span>

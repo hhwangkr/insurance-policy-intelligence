@@ -1,15 +1,16 @@
 from __future__ import annotations
 
 from collections.abc import Callable
+from pathlib import Path
 from typing import Annotated
 
-from fastapi import Depends, FastAPI, HTTPException
+from fastapi import Depends, FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
 
-from insurance_ai_api.schemas import RetrievalContextRequest
+from insurance_ai_api.schemas import RetrievalContextRequest, RetrievalOptionsResponse
 from insurance_ai_retrieval.citation_context import CitationContextBundle, build_citation_context
 from insurance_ai_retrieval.embedder import LocalSentenceTransformerEmbedder
-from insurance_ai_retrieval.index_engine import load_index_config
+from insurance_ai_retrieval.index_engine import collect_index_filter_options, load_index_config
 
 RetrievalContextRunner = Callable[[RetrievalContextRequest], CitationContextBundle]
 
@@ -55,6 +56,22 @@ def create_app() -> FastAPI:
     @application.get("/health")
     def health() -> dict[str, str]:
         return {"status": "ok"}
+
+    @application.get("/retrieval/options")
+    def retrieval_options(
+        index_dir: Annotated[str, Query()] = "data/processed/index",
+    ) -> RetrievalOptionsResponse:
+        raw = index_dir.strip()
+        if not raw:
+            raise HTTPException(status_code=422, detail="index_dir must be non-empty")
+        path = Path(raw).expanduser()
+        try:
+            opts = collect_index_filter_options(path)
+        except FileNotFoundError as exc:
+            raise HTTPException(status_code=404, detail=str(exc)) from exc
+        except OSError as exc:
+            raise HTTPException(status_code=500, detail=f"index read failed: {exc}") from exc
+        return RetrievalOptionsResponse.model_validate(opts)
 
     @application.post("/retrieval/context")
     def retrieval_context(
