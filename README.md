@@ -122,7 +122,7 @@ infra/
 - Section-aware chunking
 - Local dense semantic retrieval over chunks, with **metadata-scoped search** (insurer, product type, optional variant)
 - **Retrieval evaluation harness** driven by a **curated YAML query set** at [`data/eval/retrieval_queries.yaml`](data/eval/retrieval_queries.yaml) (see [`docs/retrieval_baseline.md`](docs/retrieval_baseline.md) for methodology and extra smoke examples)
-- **Generation layer:** grounded prompt + **`GroundedAnswer`** validation, plus a **provider-agnostic `LLMProvider`** contract and **`generate_grounded_answer`** (static/mock providers only; no vendor SDKs or API keys)
+- **Generation layer:** grounded prompt + **`GroundedAnswer`** validation, **`LLMProvider`** + **`generate_grounded_answer`**, a small **`provider_registry`** (`static` only), and debug CLIs **`build_answer_prompt`** / **`generate_answer`** (saved JSON only; no vendor SDKs or API keys)
 
 **Not yet**
 

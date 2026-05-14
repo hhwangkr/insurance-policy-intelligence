@@ -24,9 +24,14 @@ from insurance_ai_generation.llm_provider import (
     LLMResponse,
     StaticLLMProvider,
 )
+from insurance_ai_generation.provider_registry import (
+    GenerationProviderConfig,
+    create_llm_provider,
+)
 
 __all__ = [
     "ChatMessage",
+    "GenerationProviderConfig",
     "GroundedAnswer",
     "GroundedAnswerGenerationResult",
     "GroundedAnswerPrompt",
@@ -37,6 +42,7 @@ __all__ = [
     "LLMResponse",
     "StaticLLMProvider",
     "build_grounded_answer_prompt",
+    "create_llm_provider",
     "extract_citation_ids_from_text",
     "format_grounded_answer_prompt_json",
     "generate_grounded_answer",
