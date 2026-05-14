@@ -120,7 +120,8 @@ infra/
 - Section detection
 - Policy unit / variant assignment
 - Section-aware chunking
-- Local dense semantic retrieval over chunks ([`docs/retrieval_baseline.md`](docs/retrieval_baseline.md))
+- Local dense semantic retrieval over chunks, with **metadata-scoped search** (insurer, product type, optional variant)
+- **Retrieval evaluation harness** driven by a **curated YAML query set** at [`data/eval/retrieval_queries.yaml`](data/eval/retrieval_queries.yaml) (see [`docs/retrieval_baseline.md`](docs/retrieval_baseline.md) for methodology and extra smoke examples)
 
 **Not yet**
 
@@ -207,7 +208,9 @@ uv run python -m insurance_ai_retrieval.build_index \
   --index-dir data/processed/index
 ```
 
-**I. Search (metadata-scoped smoke example)**
+**I. Search (natural-language query with metadata filters)**
+
+Pass `--insurer` and `--product-type` (and optional `--variant-name`) to **scope** hits to one product slice of the index (recommended for evaluation-aligned behavior; omitting these flags searches the entire index).
 
 ```bash
 uv run python -m insurance_ai_retrieval.search_index \
@@ -220,13 +223,32 @@ uv run python -m insurance_ai_retrieval.search_index \
   --dedupe-section
 ```
 
-More scoped smoke examples and evaluation notes: [`docs/retrieval_baseline.md`](docs/retrieval_baseline.md).
+More scoped smoke examples: [`docs/retrieval_baseline.md`](docs/retrieval_baseline.md).
+
+**J. Run retrieval evaluation (after index exists)**
+
+```bash
+uv run python -m insurance_ai_retrieval.evaluate_retrieval \
+  --index-dir data/processed/index \
+  --queries data/eval/retrieval_queries.yaml \
+  --report-path data/processed/reports/retrieval_eval.md
+```
+
+Writes a markdown report under `data/processed/reports/` (generated locally; gitignored). See **Retrieval evaluation** below.
 
 **Generated artifacts (not committed)**
 
 - `data/processed/chunks/*.chunks.json` — regenerated with **F**; gitignored.
 - `data/processed/index/*` — regenerated with **H**; gitignored (directory kept via `.gitkeep`).
 - The first **H** run may download the default embedding model from Hugging Face into the local cache; **no API key** is required for this baseline.
+
+---
+
+## Retrieval evaluation
+
+Cases live in [`data/eval/retrieval_queries.yaml`](data/eval/retrieval_queries.yaml) (**16** curated queries across the staged products). The harness checks hit@* against expected section titles and that every hit respects the query’s metadata filters.
+
+**Latest baseline:** hit@1 **13/16**, hit@3 **16/16**, hit@5 **16/16**, **0** failed cases at *k*=5, metadata filter consistency **100%**. For scenario detail, extra CLI smoke tests, and how to interpret reports, see [`docs/retrieval_baseline.md`](docs/retrieval_baseline.md).
 
 ---
 
@@ -264,6 +286,8 @@ This repo keeps a **reproducible paper trail** for public disclosure PDFs:
 | Generated outputs | `data/processed/documents/*.json` | **Not tracked** (large, noisy); regenerate locally. |
 | Chunk JSON (generated) | `data/processed/chunks/*.chunks.json` | **Not tracked**; regenerate with **Run end-to-end locally** (step F). |
 | Local dense index | `data/processed/index/` | **Not tracked** except `.gitkeep`; regenerate with **Run end-to-end locally** (step H). |
+| Retrieval eval queries | `data/eval/retrieval_queries.yaml` | **Tracked** curated cases for `evaluate_retrieval` (step **J**). |
+| Retrieval eval report | `data/processed/reports/retrieval_eval.md` | **Not tracked**; written by step **J**. |
 | Portfolio sample | `examples/processed_documents/` | **Tracked** small schema exemplar. |
 
 **Tradeoff:** storing both inbox originals and normalized copies **duplicates bytes** in git for the
@@ -274,7 +298,7 @@ download names.
 **Ingestion inputs:** the pipeline resolves PDF paths from the manifest only — `source_file` must
 point under **`data/raw/manual/`** (not the inbox). See `docs/data-staging.md`.
 
-Regenerate processed JSON, sections, chunks, index, and run search using the ordered commands in **Run end-to-end locally** above. Omit `--report-path` on inspect commands for console-only output; markdown reports under `data/processed/reports/` are generated locally and gitignored.
+Regenerate processed JSON, sections, chunks, index, run search, and run retrieval evaluation using the ordered commands in **Run end-to-end locally** above. Omit `--report-path` on inspect commands for console-only output; markdown reports under `data/processed/reports/` are generated locally and gitignored.
 
 See also `docs/data-staging.md` and `examples/processed_documents/README.md`.
 

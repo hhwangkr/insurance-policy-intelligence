@@ -6,6 +6,18 @@
 
 queries:
   # --- Kyobo Life — 개인연금저축 교보로연금보험 (적립형) ---
+  - id: kyobo_annuity_delayed_payment_interest
+    query: "보험금 지급이 늦어지면 이자는 어떻게 계산돼?"
+    filters:
+      insurer: kyobolife
+      product_type: annuity
+      variant_name: 적립형
+    expected_any_section_titles:
+      - "제7조 (보험금등의지급절차)"
+      - "( 별표 3 )"
+      - "제22조 (계약의소멸)"
+      - "제33조 (해약환급금)"
+    top_k: 5
   - id: kyobo_annuity_cancellation
     query: "청약 철회는 언제까지 가능해?"
     filters:
