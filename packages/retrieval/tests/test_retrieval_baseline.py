@@ -5,6 +5,14 @@ from pathlib import Path
 
 import numpy as np
 import pytest
+from demo_corpus_fixtures import (
+    INSURER_KYOBO,
+    KYOBO_ANNUITY_DOCUMENT_ID,
+    MIRAE_VARIABLE_ANNUITY_DOCUMENT_ID,
+    PRODUCT_TYPE_ANNUITY,
+    SAMSUNG_CANCER_DOCUMENT_ID,
+    SAMSUNG_WHOLE_LIFE_DOCUMENT_ID,
+)
 
 from insurance_ai_retrieval.chunks_io import flatten_chunks_sorted, load_chunk_artifacts_from_dir
 from insurance_ai_retrieval.e5_text import format_e5_passage, format_e5_query
@@ -18,8 +26,10 @@ from insurance_ai_retrieval.index_engine import (
 from insurance_ai_retrieval.metadata import ChunkMetadataRecord, enrich_chunk_metadata
 from insurance_ai_shared.models.chunk import ChunkingConfig, DocumentChunk, DocumentChunksArtifact
 
-# Concrete document_id values from the demo corpus are fixtures for parsing/enrichment and
-# filter tests (pipeline invariants). Benchmark expected titles belong in data/eval/*.yaml.
+# Staged demo ``document_id`` strings (see ``demo_corpus_fixtures``) exercise metadata parsing,
+# enrichment, and search filters with realistic normalized keys. They are not retrieval
+# benchmarks (those live in ``data/eval/*.yaml``), and re-staging PDFs does not imply every new
+# file needs parallel unit tests here.
 
 
 def _dt() -> datetime:
@@ -147,14 +157,14 @@ def test_flatten_chunks_sorted_order() -> None:
 
 def test_chunk_metadata_record_from_document_chunk() -> None:
     ch = _chunk(
-        document_id="kyobolife_annuity_kyobo_ro_annuity_insurance_policy_terms_20260101_080b9e62",
+        document_id=KYOBO_ANNUITY_DOCUMENT_ID,
     )
     row = ChunkMetadataRecord.from_document_chunk(ch)
     assert row.chunk_id == ch.chunk_id
     assert row.section_id == ch.section_id
     assert row.policy_unit_id is ch.policy_unit_id
-    assert row.insurer == "kyobolife"
-    assert row.product_type == "annuity"
+    assert row.insurer == INSURER_KYOBO
+    assert row.product_type == PRODUCT_TYPE_ANNUITY
     assert row.product_name == "kyobo ro annuity insurance"
 
 
@@ -227,7 +237,7 @@ def test_search_result_includes_citation_fields(tmp_path: Path) -> None:
     chunks_dir = tmp_path / "chunks"
     index_dir = tmp_path / "index"
     chunks_dir.mkdir()
-    doc_id = "kyobolife_annuity_kyobo_ro_annuity_insurance_policy_terms_20260101_080b9e62"
+    doc_id = KYOBO_ANNUITY_DOCUMENT_ID
     ch = _chunk(
         document_id=doc_id,
         chunk_id=f"{doc_id}::chunk::0000::000",
@@ -245,8 +255,8 @@ def test_search_result_includes_citation_fields(tmp_path: Path) -> None:
     assert m.section_title == ch.section_title
     assert m.section_type == ch.section_type
     assert m.document_id == ch.document_id
-    assert m.insurer == "kyobolife"
-    assert m.product_type == "annuity"
+    assert m.insurer == INSURER_KYOBO
+    assert m.product_type == PRODUCT_TYPE_ANNUITY
     assert m.policy_unit_id == ch.policy_unit_id
     assert m.variant_name == ch.variant_name
     assert m.page_start == ch.page_start
@@ -304,7 +314,7 @@ def test_default_section_filters_exclude_toc(tmp_path: Path) -> None:
     chunks_dir = tmp_path / "chunks"
     index_dir = tmp_path / "index"
     chunks_dir.mkdir()
-    doc_id = "kyobolife_annuity_kyobo_ro_annuity_insurance_policy_terms_20260101_080b9e62"
+    doc_id = KYOBO_ANNUITY_DOCUMENT_ID
     toc = _chunk(
         document_id=doc_id,
         chunk_id=f"{doc_id}::chunk::toc::000",
@@ -332,8 +342,8 @@ def test_search_filters_by_insurer_and_product_type(tmp_path: Path) -> None:
     chunks_dir = tmp_path / "chunks"
     index_dir = tmp_path / "index"
     chunks_dir.mkdir()
-    kyobo = "kyobolife_annuity_kyobo_ro_annuity_insurance_policy_terms_20260101_080b9e62"
-    cancer = "samsunglife_cancer_internet_cancer_insurance_policy_terms_20260101_39af0c18"
+    kyobo = KYOBO_ANNUITY_DOCUMENT_ID
+    cancer = SAMSUNG_CANCER_DOCUMENT_ID
     k_chunk = _chunk(
         document_id=kyobo,
         chunk_id=f"{kyobo}::chunk::0000::000",
@@ -361,7 +371,7 @@ def test_search_filters_by_insurer_and_product_type(tmp_path: Path) -> None:
         query="청약 철회",
         embedder=emb,
         top_k=5,
-        filters=SearchFilters(insurer="kyobolife", product_type="annuity"),
+        filters=SearchFilters(insurer=INSURER_KYOBO, product_type=PRODUCT_TYPE_ANNUITY),
     )
     assert len(hits) == 1
     assert hits[0].metadata.document_id == kyobo
@@ -371,7 +381,7 @@ def test_search_filters_by_document_id(tmp_path: Path) -> None:
     chunks_dir = tmp_path / "chunks"
     index_dir = tmp_path / "index"
     chunks_dir.mkdir()
-    doc_id = "samsunglife_whole_life_balance_whole_life_insurance_policy_terms_20260301_1699395d"
+    doc_id = SAMSUNG_WHOLE_LIFE_DOCUMENT_ID
     a = _chunk(
         document_id=doc_id,
         chunk_id=f"{doc_id}::chunk::0000::000",
@@ -402,7 +412,7 @@ def test_search_filters_by_product_name_substring(tmp_path: Path) -> None:
     chunks_dir = tmp_path / "chunks"
     index_dir = tmp_path / "index"
     chunks_dir.mkdir()
-    doc_id = "samsunglife_cancer_internet_cancer_insurance_policy_terms_20260101_39af0c18"
+    doc_id = SAMSUNG_CANCER_DOCUMENT_ID
     ch = _chunk(
         document_id=doc_id,
         chunk_id=f"{doc_id}::chunk::0000::000",
@@ -427,7 +437,7 @@ def test_search_filters_by_variant_name(tmp_path: Path) -> None:
     chunks_dir = tmp_path / "chunks"
     index_dir = tmp_path / "index"
     chunks_dir.mkdir()
-    doc_id = "kyobolife_annuity_kyobo_ro_annuity_insurance_policy_terms_20260101_080b9e62"
+    doc_id = KYOBO_ANNUITY_DOCUMENT_ID
     match = _chunk(
         document_id=doc_id,
         chunk_id=f"{doc_id}::chunk::0000::000",
@@ -461,7 +471,7 @@ def test_search_empty_filtered_candidates_raises(tmp_path: Path) -> None:
     chunks_dir = tmp_path / "chunks"
     index_dir = tmp_path / "index"
     chunks_dir.mkdir()
-    doc_id = "kyobolife_annuity_kyobo_ro_annuity_insurance_policy_terms_20260101_080b9e62"
+    doc_id = KYOBO_ANNUITY_DOCUMENT_ID
     ch = _chunk(
         document_id=doc_id,
         chunk_id=f"{doc_id}::chunk::0000::000",
@@ -486,9 +496,7 @@ def test_dedupe_section_returns_one_chunk_per_section(tmp_path: Path) -> None:
     chunks_dir = tmp_path / "chunks"
     index_dir = tmp_path / "index"
     chunks_dir.mkdir()
-    doc_id = (
-        "miraeassetlife_variable_annuity_variable_annuity_insurance_policy_terms_20260401_76283b26"
-    )
+    doc_id = MIRAE_VARIABLE_ANNUITY_DOCUMENT_ID
     sec = f"{doc_id}::sec::dup"
     first = _chunk(
         document_id=doc_id,
@@ -525,7 +533,7 @@ def test_exclude_section_types_removes_matches(tmp_path: Path) -> None:
     chunks_dir = tmp_path / "chunks"
     index_dir = tmp_path / "index"
     chunks_dir.mkdir()
-    doc_id = "kyobolife_annuity_kyobo_ro_annuity_insurance_policy_terms_20260101_080b9e62"
+    doc_id = KYOBO_ANNUITY_DOCUMENT_ID
     appendix = _chunk(
         document_id=doc_id,
         chunk_id=f"{doc_id}::chunk::apx::000",
@@ -559,11 +567,11 @@ def test_exclude_section_types_removes_matches(tmp_path: Path) -> None:
 
 
 def test_enrich_chunk_metadata_restores_derivation_from_document_id() -> None:
-    doc_id = "kyobolife_annuity_kyobo_ro_annuity_insurance_policy_terms_20260101_080b9e62"
+    doc_id = KYOBO_ANNUITY_DOCUMENT_ID
     ch = _chunk(document_id=doc_id)
     base = ChunkMetadataRecord.from_document_chunk(ch)
     legacy = base.model_copy(update={"insurer": None, "product_type": None, "product_name": None})
     restored = enrich_chunk_metadata(legacy)
-    assert restored.insurer == "kyobolife"
-    assert restored.product_type == "annuity"
+    assert restored.insurer == INSURER_KYOBO
+    assert restored.product_type == PRODUCT_TYPE_ANNUITY
     assert restored.product_name == "kyobo ro annuity insurance"

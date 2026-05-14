@@ -82,6 +82,7 @@ scripts/          # operational helpers (see docs/data-staging.md)
 
 docs/
   data-staging.md      # Manual PDF staging and manifest conventions
+  overfitting_audit.md # Corpus vs invariant coupling inventory (see testing_strategy)
   testing_strategy.md  # pytest vs curated eval vs reports (see "Testing and evaluation strategy")
 infra/
 ```
@@ -322,6 +323,7 @@ This repo keeps a **reproducible paper trail** for public disclosure PDFs:
 | Local dense index | `data/processed/index/` | **Not tracked** except `.gitkeep`; regenerate with **Run end-to-end locally** (step H). |
 | Retrieval eval queries | `data/eval/retrieval_queries.yaml` | **Tracked** curated benchmark cases for `evaluate_retrieval` (demo corpus; step **K**). |
 | Testing / eval strategy | `docs/testing_strategy.md` | **Tracked** how pytest, YAML benchmarks, and reports fit together. |
+| Overfitting audit | `docs/overfitting_audit.md` | **Tracked** corpus-specific strings in tests vs production vs eval. |
 | Retrieval eval report | `data/processed/reports/retrieval_eval.md` | **Not tracked**; written by step **K**. |
 | Optional citation-context JSON (debug) | `data/processed/reports/*citation_context*.json` | **Not tracked** if you use `--output-path` on **J**; query-time bundles are normally in-memory only. |
 | Portfolio sample | `examples/processed_documents/` | **Tracked** small schema exemplar. |

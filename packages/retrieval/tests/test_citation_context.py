@@ -3,6 +3,12 @@ from __future__ import annotations
 from pathlib import Path
 
 import pytest
+from demo_corpus_fixtures import (
+    INSURER_KYOBO,
+    KYOBO_ANNUITY_DOCUMENT_ID,
+    KYOBO_ANNUITY_SYNTHETIC_DOCUMENT_ID,
+    PRODUCT_TYPE_ANNUITY,
+)
 from test_retrieval_baseline import FakeEmbedder, _artifact, _chunk
 
 from insurance_ai_retrieval.citation_context import (
@@ -14,19 +20,22 @@ from insurance_ai_retrieval.citation_context import (
 from insurance_ai_retrieval.index_engine import SearchFilters, SearchHit, build_local_index
 from insurance_ai_retrieval.metadata import ChunkMetadataRecord, enrich_chunk_metadata
 
+# ``KYOBO_ANNUITY_*`` constants are staged-demo shapes for metadata + filter wiring (see
+# ``demo_corpus_fixtures``), not benchmarks and not a rule that every new PDF needs tests here.
+
 
 def test_search_filters_to_mapping_roundtrip_keys() -> None:
     f = SearchFilters(
-        insurer="kyobolife",
-        product_type="annuity",
+        insurer=INSURER_KYOBO,
+        product_type=PRODUCT_TYPE_ANNUITY,
         variant_name="적립형",
         include_section_types=frozenset({"article", "appendix"}),
         exclude_section_types=frozenset({"toc"}),
         use_default_section_type_excludes=False,
     )
     m = search_filters_to_mapping(f)
-    assert m["insurer"] == "kyobolife"
-    assert m["product_type"] == "annuity"
+    assert m["insurer"] == INSURER_KYOBO
+    assert m["product_type"] == PRODUCT_TYPE_ANNUITY
     assert m["variant_name"] == "적립형"
     assert set(m["include_section_types"]) == {"appendix", "article"}
     assert m["exclude_section_types"] == ["toc"]
@@ -34,7 +43,7 @@ def test_search_filters_to_mapping_roundtrip_keys() -> None:
 
 def test_citation_bundle_from_hits_ids_and_fields() -> None:
     ch = _chunk(
-        document_id="kyobolife_annuity_kyobo_ro_annuity_insurance_policy_terms_20260101_080b9e62",
+        document_id=KYOBO_ANNUITY_DOCUMENT_ID,
         chunk_id="doc::c1",
         section_id="doc::s1",
         section_title="제1조 (목적)",
@@ -53,7 +62,7 @@ def test_citation_bundle_from_hits_ids_and_fields() -> None:
             metadata=meta.model_copy(update={"chunk_id": "doc::c2", "text": "둘째"}),
         ),
     ]
-    filters = SearchFilters(insurer="kyobolife", product_type="annuity")
+    filters = SearchFilters(insurer=INSURER_KYOBO, product_type=PRODUCT_TYPE_ANNUITY)
     bundle = citation_bundle_from_hits(
         query="테스트 질의",
         filters=filters,
@@ -72,8 +81,8 @@ def test_citation_bundle_from_hits_ids_and_fields() -> None:
     assert c0.chunk_id == "doc::c1"
     assert c0.section_id == "doc::s1"
     assert c0.section_title == "제1조 (목적)"
-    assert c0.insurer == "kyobolife"
-    assert c0.product_type == "annuity"
+    assert c0.insurer == INSURER_KYOBO
+    assert c0.product_type == PRODUCT_TYPE_ANNUITY
     assert c0.text == "본문 일부"
     assert c0.page_start == 3 and c0.page_end == 3
     assert c0.char_start == 100 and c0.char_end == 200
@@ -96,7 +105,7 @@ def test_build_citation_context_end_to_end(tmp_path: Path) -> None:
     chunks_dir = tmp_path / "chunks"
     index_dir = tmp_path / "index"
     chunks_dir.mkdir()
-    doc = "kyobolife_annuity_x_policy_terms_20260101_ab12cd34"
+    doc = KYOBO_ANNUITY_SYNTHETIC_DOCUMENT_ID
     art = _artifact(
         document_id=doc,
         chunks=[
@@ -127,7 +136,7 @@ def test_build_citation_context_end_to_end(tmp_path: Path) -> None:
         index_dir=index_dir,
         query="지연 이자",
         embedder=embedder,
-        filters=SearchFilters(insurer="kyobolife", product_type="annuity"),
+        filters=SearchFilters(insurer=INSURER_KYOBO, product_type=PRODUCT_TYPE_ANNUITY),
         top_k=2,
         dedupe_section=False,
     )
@@ -142,7 +151,7 @@ def test_build_citation_context_dedupe_section(tmp_path: Path) -> None:
     chunks_dir = tmp_path / "chunks"
     index_dir = tmp_path / "index"
     chunks_dir.mkdir()
-    doc = "kyobolife_annuity_x_policy_terms_20260101_ab12cd34"
+    doc = KYOBO_ANNUITY_SYNTHETIC_DOCUMENT_ID
     sid = f"{doc}::sec::same"
     art = _artifact(
         document_id=doc,
@@ -174,7 +183,7 @@ def test_build_citation_context_dedupe_section(tmp_path: Path) -> None:
         index_dir=index_dir,
         query="alpha",
         embedder=embedder,
-        filters=SearchFilters(insurer="kyobolife", product_type="annuity"),
+        filters=SearchFilters(insurer=INSURER_KYOBO, product_type=PRODUCT_TYPE_ANNUITY),
         top_k=5,
         dedupe_section=True,
     )

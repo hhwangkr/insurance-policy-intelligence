@@ -8,6 +8,11 @@ Groups (approximate; search for headings within this file):
 - **Inline article / clause references**: headings that are citations, not new articles.
 - **Policy units**: variant markers, dedupe, tail cutoff, multi-page marker/body.
 - **Legal / glossary**: substantive legal_reference emission, glossary headings.
+
+**Fixture policy:** Long Korean product names, variant labels, and article/appendix headings in
+this file are **synthetic layout fixtures** (realistic typography and wording patterns). They
+are **not** benchmark expectations that a specific commercial product revision must exist in
+the repo, and they are **not** substitutes for curated retrieval cases in ``data/eval/*.yaml``.
 """
 
 from __future__ import annotations

@@ -51,3 +51,5 @@ End-to-end steps (ingest → chunk → index → search) are validated over **wh
 9. Add **new curated eval rows** in `data/eval/*.yaml` **only if** the new policy should become part of the **benchmark set** you track over time.
 
 **Default:** onboarding a new product should **not** require editing Python tests—use reports and optional new YAML cases when you choose to extend the benchmark.
+
+For a **corpus-coupling inventory** (pytest vs eval vs production), see [`overfitting_audit.md`](overfitting_audit.md).

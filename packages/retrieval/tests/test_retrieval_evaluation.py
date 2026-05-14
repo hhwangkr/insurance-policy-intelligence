@@ -4,6 +4,14 @@ from pathlib import Path
 
 import pytest
 import yaml
+from demo_corpus_fixtures import (
+    INSURER_KYOBO,
+    INSURER_SAMSUNG,
+    KYOBO_ANNUITY_DOCUMENT_ID,
+    PRODUCT_TYPE_ANNUITY,
+    PRODUCT_TYPE_CANCER,
+    SAMSUNG_CANCER_DOCUMENT_ID,
+)
 
 from insurance_ai_retrieval.index_engine import SearchHit
 from insurance_ai_retrieval.metadata import ChunkMetadataRecord
@@ -22,18 +30,16 @@ from insurance_ai_retrieval.retrieval_evaluation import (
     write_report,
 )
 
-# Demo-corpus document_id strings are synthetic fixtures for stable metadata shapes (not a
-# requirement those products always remain in-repo). Curated section-title expectations live in
-# data/eval/retrieval_queries.yaml.
-
-_KYOBO_DOC = "kyobolife_annuity_kyobo_ro_annuity_insurance_policy_terms_20260101_080b9e62"
+# Staged demo ``document_id`` / insurer slugs (see ``demo_corpus_fixtures``) feed synthetic
+# ``ChunkMetadataRecord`` rows for eval helpers and filter-mismatch tests—not retrieval
+# benchmarks (``data/eval/*.yaml``), and not a requirement to add tests for every new PDF.
 
 
 def _meta(
     *,
     section_title: str,
     section_type: str = "article",
-    document_id: str = _KYOBO_DOC,
+    document_id: str = KYOBO_ANNUITY_DOCUMENT_ID,
 ) -> ChunkMetadataRecord:
     return ChunkMetadataRecord(
         chunk_id="c1",
@@ -41,8 +47,8 @@ def _meta(
         section_title=section_title,
         section_type=section_type,
         document_id=document_id,
-        insurer="kyobolife",
-        product_type="annuity",
+        insurer=INSURER_KYOBO,
+        product_type=PRODUCT_TYPE_ANNUITY,
         product_name="kyobo ro annuity insurance",
         policy_unit_id=None,
         policy_unit_name=None,
@@ -71,7 +77,7 @@ def test_expectation_met_types_only() -> None:
     spec = RetrievalQuerySpec(
         id="types_only",
         query="q",
-        filters=QueryFilters(insurer="kyobolife", product_type="annuity"),
+        filters=QueryFilters(insurer=INSURER_KYOBO, product_type=PRODUCT_TYPE_ANNUITY),
         expected_any_section_titles=[],
         expected_any_section_types=["appendix"],
         top_k=3,
@@ -84,7 +90,7 @@ def test_hit_at_rank_prefix_respects_depth() -> None:
     spec = RetrievalQuerySpec(
         id="t",
         query="q",
-        filters=QueryFilters(insurer="kyobolife", product_type="annuity"),
+        filters=QueryFilters(insurer=INSURER_KYOBO, product_type=PRODUCT_TYPE_ANNUITY),
         expected_any_section_titles=["wanted"],
         top_k=5,
     )
@@ -102,7 +108,7 @@ def test_expectation_met_with_section_types() -> None:
     spec = RetrievalQuerySpec(
         id="types",
         query="q",
-        filters=QueryFilters(insurer="kyobolife", product_type="annuity"),
+        filters=QueryFilters(insurer=INSURER_KYOBO, product_type=PRODUCT_TYPE_ANNUITY),
         expected_any_section_titles=["표"],
         expected_any_section_types=["appendix"],
         top_k=3,
@@ -119,7 +125,7 @@ def test_load_retrieval_queries_roundtrip(tmp_path: Path) -> None:
             {
                 "id": "q1",
                 "query": "hello",
-                "filters": {"insurer": "kyobolife", "product_type": "annuity"},
+                "filters": {"insurer": INSURER_KYOBO, "product_type": PRODUCT_TYPE_ANNUITY},
                 "expected_any_section_titles": ["제1조"],
                 "top_k": 3,
             }
@@ -139,7 +145,7 @@ def test_load_retrieval_queries_rejects_empty_expectations(tmp_path: Path) -> No
             {
                 "id": "bad",
                 "query": "hello",
-                "filters": {"insurer": "kyobolife", "product_type": "annuity"},
+                "filters": {"insurer": INSURER_KYOBO, "product_type": PRODUCT_TYPE_ANNUITY},
                 "expected_any_section_titles": [],
                 "top_k": 3,
             }
@@ -155,7 +161,7 @@ def test_evaluate_hits_marks_filter_mismatch() -> None:
     spec = RetrievalQuerySpec(
         id="f",
         query="q",
-        filters=QueryFilters(insurer="kyobolife", product_type="annuity"),
+        filters=QueryFilters(insurer=INSURER_KYOBO, product_type=PRODUCT_TYPE_ANNUITY),
         expected_any_section_titles=["제1조"],
         top_k=2,
     )
@@ -166,9 +172,9 @@ def test_evaluate_hits_marks_filter_mismatch() -> None:
         section_id="s2",
         section_title="other",
         section_type="article",
-        document_id="samsunglife_cancer_internet_cancer_insurance_policy_terms_20260101_39af0c18",
-        insurer="samsunglife",
-        product_type="cancer",
+        document_id=SAMSUNG_CANCER_DOCUMENT_ID,
+        insurer=INSURER_SAMSUNG,
+        product_type=PRODUCT_TYPE_CANCER,
         product_name="internet cancer insurance",
         policy_unit_id=None,
         policy_unit_name=None,
@@ -189,7 +195,7 @@ def test_all_hits_match_filters_true_when_consistent() -> None:
     spec = RetrievalQuerySpec(
         id="ok",
         query="q",
-        filters=QueryFilters(insurer="kyobolife", product_type="annuity"),
+        filters=QueryFilters(insurer=INSURER_KYOBO, product_type=PRODUCT_TYPE_ANNUITY),
         expected_any_section_titles=["제1조"],
         top_k=2,
     )
@@ -235,7 +241,7 @@ def test_hit_at_rank_prefix_empty_hits() -> None:
     spec = RetrievalQuerySpec(
         id="empty",
         query="q",
-        filters=QueryFilters(insurer="kyobolife", product_type="annuity"),
+        filters=QueryFilters(insurer=INSURER_KYOBO, product_type=PRODUCT_TYPE_ANNUITY),
         expected_any_section_titles=["x"],
         top_k=5,
     )
