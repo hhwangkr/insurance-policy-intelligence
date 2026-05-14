@@ -43,7 +43,7 @@ def test_create_static_provider_from_config() -> None:
 
 def test_unknown_provider_raises_clear_error() -> None:
     cfg = GenerationProviderConfig(provider_name="not-a-real-provider")
-    with pytest.raises(ValueError, match="unknown provider_name"):
+    with pytest.raises(ValueError, match="supported: 'static', 'ollama'"):
         create_llm_provider(cfg)
 
 
@@ -121,6 +121,25 @@ def test_generate_answer_cli_with_saved_context_fixture() -> None:
     assert "answer" in data
 
 
+def test_generate_answer_cli_ollama_requires_model() -> None:
+    repo = _repo_root()
+    ctx = repo / "data/processed/reports/citation_context_example.json"
+    if not ctx.is_file():
+        pytest.skip("citation_context_example.json not in workspace")
+    cmd = [
+        sys.executable,
+        "-m",
+        "insurance_ai_generation.generate_answer",
+        "--context-path",
+        str(ctx),
+        "--provider",
+        "ollama",
+    ]
+    proc = subprocess.run(cmd, cwd=repo, capture_output=True, text=True, check=False, timeout=60)  # noqa: S603
+    assert proc.returncode == 1
+    assert "ollama" in proc.stderr.lower() or "model" in proc.stderr.lower()
+
+
 def test_generate_answer_cli_unknown_provider_exits_nonzero() -> None:
     repo = _repo_root()
     ctx = repo / "data/processed/reports/citation_context_example.json"
@@ -171,7 +190,7 @@ def test_generate_answer_cli_static_response_override() -> None:
 
 def test_registry_modules_have_no_sdk_import_strings() -> None:
     root = Path(__file__).resolve().parents[1] / "src" / "insurance_ai_generation"
-    for fname in ("provider_registry.py", "generate_answer.py"):
+    for fname in ("provider_registry.py", "generate_answer.py", "providers/ollama_provider.py"):
         text = (root / fname).read_text(encoding="utf-8").lower()
         for token in ("openai", "anthropic", "cohere", "litellm", "google.generativeai"):
             assert token not in text, f"{token!r} found in {fname}"

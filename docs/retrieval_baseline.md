@@ -273,7 +273,19 @@ uv run python -m insurance_ai_generation.build_answer_prompt \
 
 `insurance_ai_generation.grounded_answer` defines a small **`GroundedAnswer`** model (prose + `citations_used` + `insufficient_context`) and **`validate_answer_citations`** / **`extract_citation_ids_from_text`** to detect invented `[C…]` markers, mismatches between body and `citations_used`, and empty or uncited answers when the model claims sufficient context. Use this **before or after** a future LLM call to guard rails—still **no LLM** and no provider SDKs in that module.
 
-**Phase 2H-2 (serving contract):** `insurance_ai_generation.llm_provider` exposes **`LLMRequest`** / **`LLMResponse`** and an **`LLMProvider`** protocol; **`StaticLLMProvider`** supports tests and offline demos. **`generate_grounded_answer`** wires prompt → provider → parse (JSON-first, plaintext fallback) → citation validation. **`provider_registry`** adds **`GenerationProviderConfig`** and **`create_llm_provider`** (today only **`static`**); vendor SDKs plug in behind the same registry later. **Debug-only CLI** `python -m insurance_ai_generation.generate_answer` loads a **saved** citation-context JSON (same idea as `build_answer_prompt`), runs the static registry path, and prints answer + validation + metadata—**not** the normal in-memory service flow.
+**Phase 2H-2 (serving contract):** `insurance_ai_generation.llm_provider` exposes **`LLMRequest`** / **`LLMResponse`** and an **`LLMProvider`** protocol; **`StaticLLMProvider`** supports tests and offline demos. **`generate_grounded_answer`** wires prompt → provider → parse (JSON-first, plaintext fallback) → citation validation. **`provider_registry`** adds **`GenerationProviderConfig`** and **`create_llm_provider`** for **`static`** (fixed body) and **`ollama`** (local HTTP to Ollama; stdlib only, no vendor SDK). **Debug-only CLI** `python -m insurance_ai_generation.generate_answer` loads a **saved** citation-context JSON (same idea as `build_answer_prompt`), runs the registry provider, and prints answer + validation + metadata—**not** the normal in-memory service flow.
+
+**Local Ollama (optional, free):** run [Ollama](https://ollama.com) on your machine (default base URL `http://localhost:11434`, override with `OLLAMA_BASE_URL`). Pull a model, then call the debug CLI with `--provider ollama --model <tag>` (for example `qwen2.5:7b`). No API key is required; output quality depends on the local model weights.
+
+```bash
+ollama run qwen2.5:7b
+uv run python -m insurance_ai_generation.generate_answer \
+  --context-path data/processed/reports/citation_context_example.json \
+  --provider ollama \
+  --model qwen2.5:7b
+```
+
+Static / fixture example (no local LLM):
 
 ```bash
 uv run python -m insurance_ai_generation.generate_answer \
@@ -282,7 +294,7 @@ uv run python -m insurance_ai_generation.generate_answer \
   --static-response '{"answer":"… [C1]","citations_used":["C1"],"insufficient_context":false}'
 ```
 
-**No live HTTP calls** or third-party SDK dependencies in this phase—real providers plug in behind the same interface later.
+**No paid hosted LLM APIs or vendor SDKs** in this repo phase—remote paid adapters would plug in behind the same interface later.
 
 ## Known limitations
 

@@ -9,6 +9,7 @@ from pydantic import ValidationError
 
 from insurance_ai_generation.answer_prompt import build_grounded_answer_prompt
 from insurance_ai_generation.generate_grounded_answer import generate_grounded_answer
+from insurance_ai_generation.llm_provider import LLMProviderError
 from insurance_ai_generation.provider_registry import GenerationProviderConfig, create_llm_provider
 from insurance_ai_retrieval.citation_context import CitationContextBundle
 from insurance_ai_shared.stdio_utf8 import configure_stdout_utf8
@@ -18,7 +19,7 @@ def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(
         description=(
             "Debug-only: load a saved CitationContextBundle JSON, build a prompt, run a "
-            "registry-backed static provider, and print generation JSON (no live LLM)."
+            "registry-backed provider (``static`` or local ``ollama``), and print generation JSON."
         ),
     )
     parser.add_argument(
@@ -31,7 +32,7 @@ def main(argv: list[str] | None = None) -> int:
         "--provider",
         type=str,
         default="static",
-        help="Registry provider name (only 'static' is supported today).",
+        help="Registry provider: 'static' (offline) or 'ollama' (local HTTP; requires --model).",
     )
     parser.add_argument(
         "--static-response",
@@ -77,6 +78,9 @@ def main(argv: list[str] | None = None) -> int:
         }
         out = json.dumps(payload, indent=2, ensure_ascii=False) + "\n"
     except ValueError as exc:
+        print(f"generate_answer: error: {exc}", file=sys.stderr)
+        return 1
+    except LLMProviderError as exc:
         print(f"generate_answer: error: {exc}", file=sys.stderr)
         return 1
     except ValidationError as exc:

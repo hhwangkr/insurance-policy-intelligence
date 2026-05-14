@@ -28,8 +28,14 @@ from insurance_ai_generation.provider_registry import (
     GenerationProviderConfig,
     create_llm_provider,
 )
+from insurance_ai_generation.providers.ollama_provider import (
+    DEFAULT_OLLAMA_BASE_URL,
+    OLLAMA_DEFAULT_MODEL_EXAMPLE,
+    OllamaProvider,
+)
 
 __all__ = [
+    "DEFAULT_OLLAMA_BASE_URL",
     "ChatMessage",
     "GenerationProviderConfig",
     "GroundedAnswer",
@@ -40,6 +46,8 @@ __all__ = [
     "LLMProviderError",
     "LLMRequest",
     "LLMResponse",
+    "OLLAMA_DEFAULT_MODEL_EXAMPLE",
+    "OllamaProvider",
     "StaticLLMProvider",
     "build_grounded_answer_prompt",
     "create_llm_provider",
