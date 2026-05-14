@@ -5,17 +5,7 @@
 #   --report-path data/processed/reports/retrieval_eval.md
 
 queries:
-  - id: kyobo_annuity_delayed_payment_interest
-    query: "보험금 지급이 늦어지면 이자는 어떻게 계산돼?"
-    filters:
-      insurer: kyobolife
-      product_type: annuity
-      variant_name: 적립형
-    expected_any_section_titles:
-      - "( 별표 3 )"
-      - "제7조 (보험금등의지급절차)"
-    top_k: 5
-
+  # --- Kyobo Life — 개인연금저축 교보로연금보험 (적립형) ---
   - id: kyobo_annuity_cancellation
     query: "청약 철회는 언제까지 가능해?"
     filters:
@@ -26,30 +16,151 @@ queries:
       - "제15조 (청약의철회)"
     top_k: 5
 
-  - id: samsung_cancer_diagnosis_payment
-    query: "암 진단 보험금 지급 사유는 뭐야?"
+  - id: kyobo_annuity_disclosure_violation
+    query: "계약 전 알릴 의무를 위반하면 어떻게 돼?"
+    filters:
+      insurer: kyobolife
+      product_type: annuity
+      variant_name: 적립형
+    expected_any_section_titles:
+      - "제12조 (계약전알릴의무위반의효과)"
+      - "제11조 (계약전알릴의무)"
+    top_k: 5
+
+  - id: kyobo_annuity_surrender_value
+    query: "해약환급금은 어떻게 계산되고 언제 지급돼?"
+    filters:
+      insurer: kyobolife
+      product_type: annuity
+      variant_name: 적립형
+    expected_any_section_titles:
+      - "제28조 (해약환급금)"
+      - "제33조 (해약환급금)"
+    top_k: 5
+
+  - id: kyobo_annuity_payment_criteria_table
+    query: "연금 지급 기준표는 어디에 있어?"
+    filters:
+      insurer: kyobolife
+      product_type: annuity
+      variant_name: 적립형
+    expected_any_section_titles:
+      - "( 별표 1 )"
+    expected_any_section_types:
+      - appendix
+    top_k: 5
+
+  - id: kyobo_annuity_policy_loan
+    query: "보험계약대출은 어떻게 받을 수 있어?"
+    filters:
+      insurer: kyobolife
+      product_type: annuity
+      variant_name: 적립형
+    expected_any_section_titles:
+      - "제34조 (보험계약대출)"
+      - "제29조 (보험계약대출)"
+    top_k: 5
+
+  # --- Samsung Life — 인터넷암보험 ---
+  - id: samsung_cancer_non_payment_reasons
+    query: "보험금을 지급하지 않는 사유는 뭐야?"
     filters:
       insurer: samsunglife
       product_type: cancer
     expected_any_section_titles:
-      - "제3조 [보험금의 지급사유]"
+      - "제5조 [보험금을 지급하지 않는 사유]"
     top_k: 5
 
-  - id: samsung_whole_life_surrender
-    query: "해약환급금은 어떻게 지급돼?"
+  - id: samsung_cancer_cancellation
+    query: "청약 철회는 언제까지 가능해?"
+    filters:
+      insurer: samsunglife
+      product_type: cancer
+    expected_any_section_titles:
+      - "제17조 [청약의 철회]"
+    top_k: 5
+
+  - id: samsung_cancer_diagnosis_criteria
+    query: "암 진단은 어떤 기준으로 확정돼?"
+    filters:
+      insurer: samsunglife
+      product_type: cancer
+    expected_any_section_titles:
+      - "제2조 의2 [“암”등의 정의 및 진단 확정]"
+      - "제2조 의4 [“암” 등의 정의 및 진단 확정]"
+      - "제2조 의4 [“고액치료비암”의 정의 및 진단 확정]"
+      - "제2조 의5 [“제자리암”의 정의 및 진단 확정]"
+      - "제2조 의7 [“대장점막내암”의 정의 및 진단 확정]"
+      - "제2조 의10 [AJCC 암병기설정매뉴얼 관련 유의사항]"
+      - "제2조 의14 [AJCC 암병기설정매뉴얼 관련 유의사항]"
+      - "제2조 의7 [AJCC 암병기설정매뉴얼 관련 유의사항]"
+    top_k: 5
+
+  - id: samsung_cancer_claim_documents
+    query: "보험금 청구할 때 어떤 서류가 필요해?"
+    filters:
+      insurer: samsunglife
+      product_type: cancer
+    expected_any_section_titles:
+      - "제6조 [보험금의 청구]"
+      - "제7조 [보험금의 청구]"
+      - "제4조 [보험금의 청구]"
+    top_k: 5
+
+  # --- Samsung Life — 밸런스종신보험 ---
+  - id: samsung_whole_life_contract_extinction
+    query: "계약의 소멸은 어떤 경우야?"
     filters:
       insurer: samsunglife
       product_type: whole_life
     expected_any_section_titles:
-      - "제32조 [해약환급금]"
+      - "제22조 [계약의 소멸]"
     top_k: 5
 
-  - id: mirae_variable_special_account
-    query: "특별계정 운용은 어떻게 설명돼?"
+  - id: samsung_whole_life_policy_loan
+    query: "보험계약대출은 어떻게 돼?"
+    filters:
+      insurer: samsunglife
+      product_type: whole_life
+    expected_any_section_titles:
+      - "제33조 [보험계약대출]"
+    top_k: 5
+
+  - id: samsung_whole_life_material_breach
+    query: "중대사유로 인한 해지는 어떻게 돼?"
+    filters:
+      insurer: samsunglife
+      product_type: whole_life
+    expected_any_section_titles:
+      - "제30조 [중대사유로 인한 해지]"
+      - "제21조 [중대사유로 인한 해지]"
+    top_k: 5
+
+  # --- Mirae Asset Life — 변액연금보험 ---
+  - id: mirae_variable_special_account_abolition
+    query: "특별계정 폐지는 언제 가능해?"
     filters:
       insurer: miraeassetlife
       product_type: variable_annuity
     expected_any_section_titles:
-      - "제108조 (특별계정의 설정∙운용)"
-      - "제2조 (용어의 정의)"
+      - "제45조 (특별계정의 폐지)"
+    top_k: 5
+
+  - id: mirae_variable_fund_operation
+    query: "펀드의 운용과 평가는 어떻게 돼?"
+    filters:
+      insurer: miraeassetlife
+      product_type: variable_annuity
+    expected_any_section_titles:
+      - "제35조 (펀드의 운용 및 평가)"
+    top_k: 5
+
+  - id: mirae_variable_surrender_value
+    query: "해약환급금은 어떻게 계산돼?"
+    filters:
+      insurer: miraeassetlife
+      product_type: variable_annuity
+    expected_any_section_titles:
+      - "제20조 (해약환급금)"
+      - "제50조 (해약환급금)"
     top_k: 5
