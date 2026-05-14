@@ -6,7 +6,7 @@ For **PDF → JSON → sections → chunks → index → search** from a fresh c
 
 ## What this is not
 
-- Not full RAG (no grounded answer synthesis).
+- Not full RAG (no LLM-authored answer synthesis).
 - Not hybrid BM25 + dense (BM25 / Qdrant-style services are out of scope here).
 - No reranker yet.
 - No cross-reference expansion (e.g. resolving inline “제7조” mentions to section IDs).
