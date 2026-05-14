@@ -23,9 +23,7 @@ class RetrievalFiltersPayload(BaseModel):
     use_default_section_type_excludes: bool = True
 
     def to_search_filters(self) -> SearchFilters:
-        include = (
-            frozenset(self.include_section_types) if self.include_section_types else None
-        )
+        include = frozenset(self.include_section_types) if self.include_section_types else None
         exclude_raw = self.exclude_section_types
         exclude = frozenset(exclude_raw) if exclude_raw else frozenset()
         use_default = self.use_default_section_type_excludes

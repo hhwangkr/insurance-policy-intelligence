@@ -47,7 +47,7 @@ Retrieval evaluation (YAML-driven)
 
 ```text
 apps/
-  web/            # Frontend app (scaffolding / out of MVP focus)
+  web/            # Vite + React evidence search UI (Phase 3B)
 
 packages/
   api/            # FastAPI: health + citation-ready retrieval context
@@ -90,6 +90,10 @@ infra/
 - sentence-transformers (default embedding model)
 - NumPy local index (cosine similarity)
 
+### Frontend (evidence UI)
+
+- Node.js + **Vite 4** + **React 18** + TypeScript (`apps/web`)
+
 ### Tooling
 
 - uv
@@ -113,6 +117,7 @@ infra/
 - **Citation context** (`CitationContextBundle`) built at query time via `build_citation_context`
 - **Retrieval evaluation harness** driven by [`data/eval/retrieval_queries.yaml`](data/eval/retrieval_queries.yaml) (see [`docs/testing_strategy.md`](docs/testing_strategy.md) and [`docs/retrieval_baseline.md`](docs/retrieval_baseline.md))
 - **HTTP API** (`packages/api`): `GET /health`, `POST /retrieval/context` — same citation bundle as the CLI; **not** an LLM answer endpoint
+- **Web UI** (`apps/web`): minimal evidence search over the API (no chat, no generation)
 
 **Not yet / out of scope for this MVP**
 
@@ -264,13 +269,15 @@ Cases live in [`data/eval/retrieval_queries.yaml`](data/eval/retrieval_queries.y
 
 The **`packages/api`** service exposes citation-ready retrieval context over HTTP (same `build_citation_context` path as the CLI). Responses are **`CitationContextBundle` JSON**—ranked passages with `C1`, `C2`, … handles and metadata—**not** LLM-authored answers.
 
-A simple evidence-search frontend can be added later on top of this API.
+**CORS:** the API allows browser calls from the Vite dev server on `http://localhost:5173` and `http://127.0.0.1:5173`.
 
 Run from the repository root (the POST handler loads the embedding model and index from disk **per request** for now; ensure step **H** has produced `data/processed/index`):
 
 ```bash
-uv run uvicorn insurance_ai_api.main:app --reload
+uv run uvicorn insurance_ai_api.main:app --reload --host 127.0.0.1 --port 8765
 ```
+
+(You may use any host/port; the web app defaults to `http://127.0.0.1:8765`.)
 
 Example request body for `POST /retrieval/context`:
 
@@ -298,6 +305,40 @@ Example request body for `POST /retrieval/context`:
 
 ---
 
+## Web UI (Phase 3B)
+
+**`apps/web`** is a minimal **Vite + React + TypeScript** client: **Insurance Policy Evidence Search**. It calls `POST /retrieval/context` and renders citation cards plus a collapsible raw JSON view. It does **not** generate answers, chat, or call any LLM.
+
+Requires **Node.js** (for `npm`). A `package-lock.json` is included for reproducible installs. From the repo root:
+
+```bash
+cd apps/web
+npm ci
+npm run dev
+```
+
+Or with a regular install:
+
+```bash
+cd apps/web
+npm install
+npm run dev
+```
+
+Production-style bundle (typecheck + Vite build):
+
+```bash
+cd apps/web
+npm install
+npm run build
+```
+
+Optional: set `VITE_API_BASE_URL` when running `npm run build` to point the UI at a non-default API origin.
+
+**Local workflow:** start the API (see [HTTP API](#http-api-phase-3a)), then `npm run dev`, open the printed local URL (usually `http://localhost:5173`), run a search against your built index path.
+
+---
+
 ## Testing and evaluation strategy
 
 - **`pytest`** (under `packages/*/tests/`) should mostly guard **reusable pipeline invariants** (schemas, filters, deterministic citation handles)—not every product-specific section title.
@@ -317,10 +358,16 @@ Install dependencies:
 uv sync
 ```
 
-Run backend (same as [HTTP API](#http-api-phase-3a)):
+Run backend (see [HTTP API](#http-api-phase-3a)); optional explicit host/port:
 
 ```bash
-uv run uvicorn insurance_ai_api.main:app --reload
+uv run uvicorn insurance_ai_api.main:app --reload --host 127.0.0.1 --port 8765
+```
+
+Run evidence UI (see [Web UI](#web-ui-phase-3b)):
+
+```bash
+cd apps/web && npm install && npm run dev
 ```
 
 Run tests:

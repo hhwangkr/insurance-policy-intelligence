@@ -4,6 +4,7 @@ from collections.abc import Callable
 from typing import Annotated
 
 from fastapi import Depends, FastAPI, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
 
 from insurance_ai_api.schemas import RetrievalContextRequest
 from insurance_ai_retrieval.citation_context import CitationContextBundle, build_citation_context
@@ -40,6 +41,15 @@ def create_app() -> FastAPI:
             "Retrieval-first MVP: returns citation-ready evidence context, "
             "not LLM-authored answers."
         ),
+    )
+    application.add_middleware(
+        CORSMiddleware,
+        allow_origins=[
+            "http://localhost:5173",
+            "http://127.0.0.1:5173",
+        ],
+        allow_methods=["GET", "POST", "OPTIONS"],
+        allow_headers=["*"],
     )
 
     @application.get("/health")
