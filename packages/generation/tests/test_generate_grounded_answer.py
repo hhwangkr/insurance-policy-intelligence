@@ -8,7 +8,10 @@ from insurance_ai_generation.generate_grounded_answer import (
     generate_grounded_answer,
     parse_provider_text_to_grounded_answer,
 )
-from insurance_ai_generation.grounded_answer import grounded_answer_json_schema
+from insurance_ai_generation.grounded_answer import (
+    grounded_answer_json_schema,
+    grounded_answer_json_schema_for_citations,
+)
 from insurance_ai_generation.llm_provider import LLMRequest, LLMResponse, StaticLLMProvider
 
 
@@ -98,9 +101,56 @@ def test_generate_insufficient_context_json_without_citations() -> None:
     assert result.validation.is_valid
 
 
-def test_generate_grounded_answer_passes_grounded_answer_json_schema() -> None:
-    provider = StaticLLMProvider("{}")
+def test_generate_grounded_answer_non_latin_answer_valid_when_markers_align() -> None:
+    payload = {
+        "answer": "根据条款说明 [C1]。",
+        "citations_used": ["C1"],
+        "insufficient_context": False,
+    }
+    provider = StaticLLMProvider(json.dumps(payload, ensure_ascii=False))
     prompt = _prompt(citation_ids=["C1"])
+    result = generate_grounded_answer(prompt, provider)
+    assert result.validation.is_valid
+
+
+def test_generate_grounded_answer_structured_without_inline_markers() -> None:
+    payload = {
+        "answer": "보험금 지급 지연 이자 설명.",
+        "citations_used": ["C2", "C3", "C5"],
+        "insufficient_context": False,
+    }
+    provider = StaticLLMProvider(json.dumps(payload, ensure_ascii=False))
+    prompt = _prompt(citation_ids=["C1", "C2", "C3", "C4", "C5"])
+    result = generate_grounded_answer(prompt, provider)
+    assert result.validation.is_valid
+
+
+def test_generate_grounded_answer_structured_fails_inline_strict() -> None:
+    payload = {
+        "answer": "보험금 지급 지연 이자 설명.",
+        "citations_used": ["C2", "C3", "C5"],
+        "insufficient_context": False,
+    }
+    provider = StaticLLMProvider(json.dumps(payload, ensure_ascii=False))
+    prompt = _prompt(citation_ids=["C1", "C2", "C3", "C4", "C5"])
+    result = generate_grounded_answer(prompt, provider, require_inline_markers=True)
+    assert not result.validation.is_valid
+    assert any("at least one citation marker" in e for e in result.validation.errors)
+
+
+def test_generate_grounded_answer_passes_citation_aware_json_schema() -> None:
+    provider = StaticLLMProvider("{}")
+    prompt = _prompt(citation_ids=["C1", "C2"])
+    generate_grounded_answer(prompt, provider)
+    assert provider.last_request is not None
+    assert provider.last_request.response_schema == grounded_answer_json_schema_for_citations(
+        ["C1", "C2"],
+    )
+
+
+def test_generate_grounded_answer_empty_citation_ids_uses_generic_schema() -> None:
+    provider = StaticLLMProvider("{}")
+    prompt = _prompt(citation_ids=[])
     generate_grounded_answer(prompt, provider)
     assert provider.last_request is not None
     assert provider.last_request.response_schema == grounded_answer_json_schema()

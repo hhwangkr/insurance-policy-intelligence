@@ -10,6 +10,7 @@ from insurance_ai_generation.grounded_answer import (
     GroundedAnswerValidation,
     extract_citation_ids_from_text,
     grounded_answer_json_schema,
+    grounded_answer_json_schema_for_citations,
     validate_answer_citations,
 )
 from insurance_ai_generation.llm_provider import LLMProvider, LLMRequest
@@ -58,19 +59,30 @@ def generate_grounded_answer(
     model: str | None = None,
     temperature: float = 0.0,
     max_tokens: int | None = None,
+    *,
+    require_inline_markers: bool = False,
 ) -> GroundedAnswerGenerationResult:
     """Call ``provider`` with ``prompt.messages``, parse JSON or plaintext, validate citations."""
+    response_schema = (
+        grounded_answer_json_schema_for_citations(prompt.citation_ids)
+        if prompt.citation_ids
+        else grounded_answer_json_schema()
+    )
     request = LLMRequest(
         messages=list(prompt.messages),
         model=model,
         temperature=temperature,
         max_tokens=max_tokens,
-        response_schema=grounded_answer_json_schema(),
+        response_schema=response_schema,
     )
     response = provider.complete(request)
     answer = parse_provider_text_to_grounded_answer(response.text)
     allowed = set(prompt.citation_ids)
-    validation = validate_answer_citations(answer, allowed)
+    validation = validate_answer_citations(
+        answer,
+        allowed,
+        require_inline_markers=require_inline_markers,
+    )
     return GroundedAnswerGenerationResult(
         answer=answer,
         validation=validation,

@@ -9,6 +9,10 @@ from pydantic import ValidationError
 
 from insurance_ai_generation.answer_prompt import build_grounded_answer_prompt
 from insurance_ai_generation.generate_grounded_answer import generate_grounded_answer
+from insurance_ai_generation.grounded_answer import (
+    render_citation_summary,
+    render_grounded_answer_with_citations,
+)
 from insurance_ai_generation.llm_provider import LLMProviderError
 from insurance_ai_generation.provider_registry import GenerationProviderConfig, create_llm_provider
 from insurance_ai_retrieval.citation_context import CitationContextBundle
@@ -57,6 +61,11 @@ def main(argv: list[str] | None = None) -> int:
         help="Exit 0 even when validation fails (default for static).",
     )
     parser.set_defaults(fail_on_invalid=None)
+    parser.add_argument(
+        "--require-inline-citations",
+        action="store_true",
+        help=("Require [C1]-style markers in answer matching citations_used (strict inline mode)."),
+    )
     args = parser.parse_args(argv)
 
     configure_stdout_utf8()
@@ -86,6 +95,7 @@ def main(argv: list[str] | None = None) -> int:
             model=config.model,
             temperature=config.temperature,
             max_tokens=config.max_tokens,
+            require_inline_markers=args.require_inline_citations,
         )
         payload = {
             "answer": result.answer.model_dump(),
@@ -93,6 +103,8 @@ def main(argv: list[str] | None = None) -> int:
             "provider_name": result.provider_name,
             "model_name": result.model_name,
             "raw_text": result.raw_text,
+            "rendered_answer": render_grounded_answer_with_citations(result.answer),
+            "citation_summary": render_citation_summary(result.answer, bundle),
         }
         out = json.dumps(payload, indent=2, ensure_ascii=False) + "\n"
     except ValueError as exc:

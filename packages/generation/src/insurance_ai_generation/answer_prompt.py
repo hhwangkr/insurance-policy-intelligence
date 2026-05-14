@@ -31,6 +31,30 @@ def _display_optional(value: str | None) -> str:
     return value if value is not None else "n/a"
 
 
+_VALID_JSON_EXAMPLE = "\n".join(
+    [
+        "Valid structured JSON example (citations_used lists passages; inline [C3] optional here):",
+        "{",
+        '  "answer": "보험금 지급 지연 이자는 별표 3의 기준에 따라 계산됩니다.",',
+        '  "citations_used": ["C3"],',
+        '  "insufficient_context": false',
+        "}",
+    ],
+)
+
+_INVALID_JSON_EXAMPLE = "\n".join(
+    [
+        "Invalid example (do not do this):",
+        "{",
+        '  "answer": "Some grounded answer text.",',
+        '  "citations_used": [],',
+        '  "insufficient_context": false',
+        "}",
+        "Reason: when insufficient_context is false, citations_used must list the C-style IDs "
+        "you used (cannot be empty).",
+    ],
+)
+
 _SYSTEM_INSTRUCTIONS = "\n".join(
     [
         "You are an insurance policy assistant working in strict retrieval-grounded mode.",
@@ -41,28 +65,43 @@ _SYSTEM_INSTRUCTIONS = "\n".join(
         "section).",
         "- Do NOT use outside knowledge, general legal advice, or information not present in the "
         "citations.",
-        "- Do NOT guess or speculate. If the excerpts are insufficient to answer safely, state "
-        "clearly that the provided policy excerpts are insufficient. Do not invent details.",
-        "- When you support a claim with evidence, cite using the exact labels given "
-        "(e.g. [C1], [C2]). Do NOT invent citation IDs.",
-        "- Wording and coverage differ by insurer, product, and variant; do not generalize unless "
-        "the citations justify it.",
-        "- Reply in the SAME language as the user's question unless they explicitly ask for "
-        "another language.",
+        "- Do NOT guess or speculate. If the excerpts are insufficient to answer safely, set "
+        "insufficient_context to true and explain briefly in answer; do not invent details.",
+        "",
+        "Language:",
+        "- Answer in the same language as the user's question.",
+        "- Do not switch languages unless the user explicitly asks for another language.",
+        "",
+        "Citations:",
+        "- Valid citation IDs for JSON are ONLY the handles listed in the user message under "
+        '"VALID CITATION IDS" (e.g. C1, C2).',
+        '- In JSON, citations_used must contain ONLY those IDs as plain strings like "C1", '
+        '"C2". Do not translate, rename, or substitute them.',
+        "- Do NOT put section titles, article names, or clause labels in citations_used. "
+        "Use only C-style IDs from the list.",
+        "- When insufficient_context is false, citations_used must be non-empty and list every "
+        "passage ID you relied on (structured citation contract).",
+        "- Inline square-bracket markers like [C1], [C2] in the answer are preferred for "
+        "readability but not mandatory in the default contract.",
+        "- If you include inline markers, use ONLY ASCII square brackets exactly like [C1], "
+        "[C2]. Do NOT use (C1), (C1 clause refs), bare C1, section titles, article names, or "
+        "page numbers instead of [C1]-style markers.",
+        "- Downstream display may append missing [Cn] markers deterministically from "
+        "citations_used; still list correct IDs in citations_used.",
         "",
         "Output format (mandatory):",
         "- Return ONLY valid JSON. Do not wrap it in markdown fences; do not add any text before "
         "or after the JSON object.",
         '- Use exactly these keys: "answer", "citations_used", "insufficient_context".',
-        '- The "answer" string MUST include at least one bracket citation like [C1] that matches '
-        "a passage you used, unless you set insufficient_context to true.",
-        '- "citations_used" MUST list every citation ID (e.g. C1, C2) that appears as [C1], '
-        "[C2] in answer, in any order, with no extras.",
         '- If the excerpts are insufficient to answer, set "insufficient_context": true and '
         "give a brief explanation in answer; citations_used may be empty.",
         "",
-        "The next user message contains [Question], retrieval filter context, and [Citations]. "
-        "Stay within those passages only.",
+        _VALID_JSON_EXAMPLE,
+        "",
+        _INVALID_JSON_EXAMPLE,
+        "",
+        "The user message contains [Question], retrieval filter context, VALID CITATION IDS, "
+        "and [Citations]. Stay within those passages only.",
     ],
 )
 
@@ -101,6 +140,20 @@ def _build_user_content(bundle: CitationContextBundle) -> str:
         )
         parts.append("")
     else:
+        id_list = ", ".join(c.citation_id for c in bundle.citations)
+        parts.extend(
+            [
+                "VALID CITATION IDS:",
+                id_list,
+                "",
+                "Use only these IDs. Do not translate them.",
+                "",
+                "Valid citation IDs are ONLY the tokens above. "
+                "Do not use any other citation names, section titles, or article numbers as "
+                "citation identifiers.",
+                "",
+            ],
+        )
         for c in bundle.citations:
             parts.append(_format_citation_block(c))
     return "\n".join(parts).rstrip() + "\n"

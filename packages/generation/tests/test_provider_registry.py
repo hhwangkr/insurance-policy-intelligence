@@ -13,6 +13,11 @@ from insurance_ai_generation.answer_prompt import (
     build_grounded_answer_prompt,
 )
 from insurance_ai_generation.generate_grounded_answer import generate_grounded_answer
+from insurance_ai_generation.grounded_answer import (
+    GroundedAnswer,
+    render_citation_summary,
+    render_grounded_answer_with_citations,
+)
 from insurance_ai_generation.provider_registry import GenerationProviderConfig, create_llm_provider
 from insurance_ai_retrieval.citation_context import CitationContextBundle
 
@@ -104,6 +109,8 @@ def test_generate_answer_cli_with_saved_context_fixture() -> None:
     ctx = repo / "data/processed/reports/citation_context_example.json"
     if not ctx.is_file():
         pytest.skip("citation_context_example.json not in workspace")
+    raw = json.loads(ctx.read_text(encoding="utf-8"))
+    bundle = CitationContextBundle.model_validate(raw)
     cmd = [
         sys.executable,
         "-m",
@@ -113,12 +120,63 @@ def test_generate_answer_cli_with_saved_context_fixture() -> None:
         "--provider",
         "static",
     ]
-    proc = subprocess.run(cmd, cwd=repo, capture_output=True, text=True, check=False, timeout=60)  # noqa: S603
+    proc = subprocess.run(  # noqa: S603
+        cmd,
+        cwd=repo,
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+        check=False,
+        timeout=60,
+    )
     assert proc.returncode == 0, proc.stderr
     data = json.loads(proc.stdout)
     assert data["provider_name"] == "static"
     assert data["validation"]["is_valid"] is True
     assert "answer" in data
+    ga = GroundedAnswer.model_validate(data["answer"])
+    assert data["rendered_answer"] == render_grounded_answer_with_citations(ga)
+    assert data["citation_summary"] == render_citation_summary(ga, bundle)
+
+
+def test_generate_answer_cli_rendered_answer_structured_static() -> None:
+    repo = _repo_root()
+    ctx = repo / "data/processed/reports/citation_context_example.json"
+    if not ctx.is_file():
+        pytest.skip("citation_context_example.json not in workspace")
+    raw = json.loads(ctx.read_text(encoding="utf-8"))
+    bundle = CitationContextBundle.model_validate(raw)
+    payload = {
+        "answer": "Structured body only.",
+        "citations_used": ["C2", "C3", "C5"],
+        "insufficient_context": False,
+    }
+    cmd = [
+        sys.executable,
+        "-m",
+        "insurance_ai_generation.generate_answer",
+        "--context-path",
+        str(ctx),
+        "--provider",
+        "static",
+        "--static-response",
+        json.dumps(payload, ensure_ascii=False),
+    ]
+    proc = subprocess.run(  # noqa: S603
+        cmd,
+        cwd=repo,
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+        check=False,
+        timeout=60,
+    )
+    assert proc.returncode == 0, proc.stderr
+    data = json.loads(proc.stdout)
+    ga = GroundedAnswer.model_validate(data["answer"])
+    assert data["rendered_answer"] == "Structured body only. [C2][C3][C5]"
+    assert data["rendered_answer"] == render_grounded_answer_with_citations(ga)
+    assert data["citation_summary"] == render_citation_summary(ga, bundle)
 
 
 def test_generate_answer_cli_ollama_requires_model() -> None:
@@ -135,7 +193,15 @@ def test_generate_answer_cli_ollama_requires_model() -> None:
         "--provider",
         "ollama",
     ]
-    proc = subprocess.run(cmd, cwd=repo, capture_output=True, text=True, check=False, timeout=60)  # noqa: S603
+    proc = subprocess.run(  # noqa: S603
+        cmd,
+        cwd=repo,
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+        check=False,
+        timeout=60,
+    )
     assert proc.returncode == 1
     assert "ollama" in proc.stderr.lower() or "model" in proc.stderr.lower()
 
@@ -155,7 +221,15 @@ def test_generate_answer_cli_unknown_provider_exits_nonzero() -> None:
         "--provider",
         bad,
     ]
-    proc = subprocess.run(cmd, cwd=repo, capture_output=True, text=True, check=False, timeout=60)  # noqa: S603
+    proc = subprocess.run(  # noqa: S603
+        cmd,
+        cwd=repo,
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+        check=False,
+        timeout=60,
+    )
     assert proc.returncode == 1
     assert "unknown provider_name" in proc.stderr
 
@@ -181,7 +255,15 @@ def test_generate_answer_cli_static_response_override() -> None:
         "--static-response",
         json.dumps(payload, ensure_ascii=False),
     ]
-    proc = subprocess.run(cmd, cwd=repo, capture_output=True, text=True, check=False, timeout=60)  # noqa: S603
+    proc = subprocess.run(  # noqa: S603
+        cmd,
+        cwd=repo,
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+        check=False,
+        timeout=60,
+    )
     assert proc.returncode == 0, proc.stderr
     data = json.loads(proc.stdout)
     assert data["answer"]["answer"] == payload["answer"]
@@ -209,7 +291,15 @@ def test_generate_answer_cli_invalid_static_default_exits_zero() -> None:
         "--static-response",
         json.dumps(bad, ensure_ascii=False),
     ]
-    proc = subprocess.run(cmd, cwd=repo, capture_output=True, text=True, check=False, timeout=60)  # noqa: S603
+    proc = subprocess.run(  # noqa: S603
+        cmd,
+        cwd=repo,
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+        check=False,
+        timeout=60,
+    )
     assert proc.returncode == 0, proc.stderr
     data = json.loads(proc.stdout)
     assert data["validation"]["is_valid"] is False
@@ -237,7 +327,15 @@ def test_generate_answer_cli_fail_on_invalid_static_exits_nonzero() -> None:
         json.dumps(bad, ensure_ascii=False),
         "--fail-on-invalid",
     ]
-    proc = subprocess.run(cmd, cwd=repo, capture_output=True, text=True, check=False, timeout=60)  # noqa: S603
+    proc = subprocess.run(  # noqa: S603
+        cmd,
+        cwd=repo,
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+        check=False,
+        timeout=60,
+    )
     assert proc.returncode == 1
     data = json.loads(proc.stdout)
     assert data["validation"]["is_valid"] is False
@@ -265,7 +363,15 @@ def test_generate_answer_cli_no_fail_on_invalid_exits_zero() -> None:
         json.dumps(bad, ensure_ascii=False),
         "--no-fail-on-invalid",
     ]
-    proc = subprocess.run(cmd, cwd=repo, capture_output=True, text=True, check=False, timeout=60)  # noqa: S603
+    proc = subprocess.run(  # noqa: S603
+        cmd,
+        cwd=repo,
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+        check=False,
+        timeout=60,
+    )
     assert proc.returncode == 0, proc.stderr
 
 

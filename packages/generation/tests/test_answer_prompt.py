@@ -44,11 +44,23 @@ def _bundle(**kwargs: object) -> CitationContextBundle:
     return CitationContextBundle.model_validate(defaults)
 
 
-def test_build_grounded_answer_prompt_system_requires_json_only() -> None:
+def test_build_grounded_answer_prompt_system_language_neutral_and_citations() -> None:
     p = build_grounded_answer_prompt(_bundle())
     system = p.messages[0].content
+    assert system.lstrip().startswith("You are an insurance policy assistant")
+    assert "Answer in the same language as the user's question" in system
+    assert "Do not switch languages unless the user explicitly asks" in system
     assert "Return ONLY valid JSON" in system
-    assert "insufficient_context" in system
+    assert "square-bracket" in system.lower()
+    assert "(C1)" in system
+    assert "not mandatory in the default contract" in system.lower()
+    assert "deterministically" in system.lower()
+    assert "Valid structured JSON example" in system
+    assert "별표 3의 기준에 따라 계산됩니다." in system
+    assert '"citations_used": ["C3"]' in system
+    assert "Invalid example (do not do this):" in system
+    assert '"citations_used": []' in system
+    assert "citations_used must list the C-style IDs" in system
     b = _bundle(
         citations=[
             _entry(citation_id="C1", section_title="제A조", page_start=1, page_end=1),
@@ -65,6 +77,10 @@ def test_build_grounded_answer_prompt_system_requires_json_only() -> None:
     )
     p = build_grounded_answer_prompt(b)
     user = p.messages[1].content
+    assert "VALID CITATION IDS:" in user
+    assert "Valid citation IDs are ONLY" in user
+    assert "Use only these IDs. Do not translate them." in user
+    assert "C1, C2" in user
     assert "[C1]" in user and "[C2]" in user
     assert "제A조" in user and "제B조" in user
     assert "pages: 1-1" in user

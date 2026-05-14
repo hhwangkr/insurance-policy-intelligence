@@ -116,6 +116,41 @@ def test_ollama_includes_format_when_response_schema_set() -> None:
     assert pl.get("format") == schema
 
 
+def test_ollama_format_citation_aware_schema_has_enum_on_citations_used() -> None:
+    from insurance_ai_generation.grounded_answer import grounded_answer_json_schema_for_citations
+
+    captured: dict[str, object] = {}
+
+    def fake_post(_u: str, body: bytes, _t: float) -> tuple[int, bytes]:
+        captured["payload"] = json.loads(body.decode("utf-8"))
+        return (
+            200,
+            json.dumps(
+                {
+                    "model": "m",
+                    "message": {"role": "assistant", "content": "{}"},
+                    "done": True,
+                },
+            ).encode(),
+        )
+
+    schema = grounded_answer_json_schema_for_citations(["C1", "C2"])
+    p = OllamaProvider("m", http_post=fake_post)
+    p.complete(
+        LLMRequest(
+            messages=[ChatMessage(role="user", content="hi")],
+            model="m",
+            response_schema=schema,
+        ),
+    )
+    pl = captured["payload"]
+    assert isinstance(pl, dict)
+    fmt = pl.get("format")
+    assert isinstance(fmt, dict)
+    cu = fmt["properties"]["citations_used"]
+    assert cu["items"]["enum"] == ["C1", "C2"]
+
+
 def test_ollama_includes_format_json_string_when_response_format_json() -> None:
     captured: dict[str, object] = {}
 
