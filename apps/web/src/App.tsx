@@ -11,6 +11,9 @@ type CitationEntry = {
   document_id: string;
   insurer: string | null;
   product_type: string | null;
+  insurer_display_name?: string | null;
+  product_type_display_name?: string | null;
+  product_display_name?: string | null;
   policy_unit_name: string | null;
   variant_name: string | null;
   page_start: number;
@@ -29,12 +32,14 @@ type CitationBundle = {
   citations: CitationEntry[];
 };
 
+type FilterOption = { value: string; label: string };
+
 type RetrievalOptions = {
-  insurers: string[];
-  product_types: string[];
-  product_names: string[];
-  variant_names: string[];
-  policy_unit_names: string[];
+  insurers: FilterOption[];
+  product_types: FilterOption[];
+  product_names: FilterOption[];
+  variant_names: FilterOption[];
+  policy_unit_names: FilterOption[];
 };
 
 type OptionsLoadState = "idle" | "loading" | "ok" | "error";
@@ -47,6 +52,14 @@ const PREVIEW_CHARS = 280;
 
 const API_REACH_HELP =
   "Could not reach the retrieval API at {url}. Make sure the API is running:\n\nuv run uvicorn insurance_ai_api.main:app --host 127.0.0.1 --port 8765";
+
+/** Static prompts only — copy into the query field; no chat or auto-search. */
+const EXAMPLE_EVIDENCE_QUERIES: readonly string[] = [
+  "보험금 지급이 늦어지면 이자는 어떻게 계산돼?",
+  "청약 철회는 언제까지 가능해?",
+  "보험금을 청구하려면 어떤 서류가 필요해?",
+  "해약환급금은 어떻게 지급돼?",
+];
 
 function isLikelyFetchNetworkError(e: unknown): boolean {
   if (e instanceof TypeError) {
@@ -61,13 +74,50 @@ function isLikelyFetchNetworkError(e: unknown): boolean {
   return false;
 }
 
-function mergeSortedChoices(current: string, apiList: string[]): string[] {
-  const set = new Set(apiList);
-  const t = current.trim();
-  if (t) {
-    set.add(t);
+function isFilterOptionList(value: unknown): value is FilterOption[] {
+  if (!Array.isArray(value)) {
+    return false;
   }
-  return Array.from(set).sort((a, b) => a.localeCompare(b));
+  return value.every(
+    (x) =>
+      x !== null &&
+      typeof x === "object" &&
+      typeof (x as FilterOption).value === "string" &&
+      typeof (x as FilterOption).label === "string",
+  );
+}
+
+function mergeSortedChoiceOptions(current: string, options: FilterOption[]): FilterOption[] {
+  const map = new Map(options.map((o) => [o.value, o]));
+  const t = current.trim();
+  if (t && !map.has(t)) {
+    map.set(t, { value: t, label: t });
+  }
+  return Array.from(map.values()).sort((a, b) => a.value.localeCompare(b.value));
+}
+
+function scopeSummaryLine(
+  insurer: string,
+  productType: string,
+  variantName: string,
+  options: RetrievalOptions | null,
+): string {
+  const iv = insurer.trim();
+  const pv = productType.trim();
+  const vv = variantName.trim();
+  const pick = (v: string, list: FilterOption[]) => {
+    if (!v) {
+      return "—";
+    }
+    const hit = list.find((o) => o.value === v);
+    return hit?.label ?? v;
+  };
+  if (!options) {
+    return `${iv || "—"} / ${pv || "—"} / ${vv || "—"}`;
+  }
+  const vLabel =
+    (vv && options.variant_names.find((o) => o.value === vv)?.label) || vv || "—";
+  return `${pick(iv, options.insurers)} / ${pick(pv, options.product_types)} / ${vLabel}`;
 }
 
 function CitationCard({ c }: { c: CitationEntry }) {
@@ -75,6 +125,12 @@ function CitationCard({ c }: { c: CitationEntry }) {
   const raw = c.text.trim();
   const isLong = raw.length > PREVIEW_CHARS;
   const preview = isLong && !expanded ? `${raw.slice(0, PREVIEW_CHARS)}…` : raw;
+
+  const insurerLabel = c.insurer_display_name ?? c.insurer;
+  const productLabel = c.product_type_display_name ?? c.product_type;
+  const prettyMeta = [insurerLabel, productLabel, c.variant_name].filter(Boolean).join(" · ");
+  const slugMeta = [c.insurer, c.product_type, c.variant_name].filter(Boolean).join(" · ");
+  const showSlugMeta = Boolean(slugMeta && prettyMeta && slugMeta !== prettyMeta);
 
   return (
     <article className="citation-card">
@@ -87,9 +143,8 @@ function CitationCard({ c }: { c: CitationEntry }) {
         </span>
         <span className="citation-card__score">score {c.score.toFixed(4)}</span>
       </div>
-      <div className="citation-card__meta">
-        {[c.insurer, c.product_type, c.variant_name].filter(Boolean).join(" · ") || "—"}
-      </div>
+      <div className="citation-card__meta">{prettyMeta || "—"}</div>
+      {showSlugMeta ? <div className="citation-card__meta-slug">{slugMeta}</div> : null}
       <p className="citation-card__text">{preview}</p>
       {isLong ? (
         <button type="button" className="link-button" onClick={() => setExpanded((v) => !v)}>
@@ -162,11 +217,11 @@ export default function App() {
         }
         const parsed = data as Partial<RetrievalOptions>;
         if (
-          !Array.isArray(parsed.insurers) ||
-          !Array.isArray(parsed.product_types) ||
-          !Array.isArray(parsed.product_names) ||
-          !Array.isArray(parsed.variant_names) ||
-          !Array.isArray(parsed.policy_unit_names)
+          !isFilterOptionList(parsed.insurers) ||
+          !isFilterOptionList(parsed.product_types) ||
+          !isFilterOptionList(parsed.product_names) ||
+          !isFilterOptionList(parsed.variant_names) ||
+          !isFilterOptionList(parsed.policy_unit_names)
         ) {
           setRetrievalOptions(null);
           setOptionsLoad("error");
@@ -193,15 +248,15 @@ export default function App() {
   }, [apiBaseUrl, indexDir]);
 
   const insurerChoices = useMemo(
-    () => mergeSortedChoices(insurer, retrievalOptions?.insurers ?? []),
+    () => mergeSortedChoiceOptions(insurer, retrievalOptions?.insurers ?? []),
     [insurer, retrievalOptions],
   );
   const productTypeChoices = useMemo(
-    () => mergeSortedChoices(productType, retrievalOptions?.product_types ?? []),
+    () => mergeSortedChoiceOptions(productType, retrievalOptions?.product_types ?? []),
     [productType, retrievalOptions],
   );
   const variantChoices = useMemo(
-    () => mergeSortedChoices(variantName, retrievalOptions?.variant_names ?? []),
+    () => mergeSortedChoiceOptions(variantName, retrievalOptions?.variant_names ?? []),
     [variantName, retrievalOptions],
   );
 
@@ -212,12 +267,10 @@ export default function App() {
     indexDir,
   ]);
 
-  const scopeSummary = useMemo(() => {
-    const i = insurer.trim() || "—";
-    const p = productType.trim() || "—";
-    const v = variantName.trim() || "—";
-    return `${i} / ${p} / ${v}`;
-  }, [insurer, productType, variantName]);
+  const scopeSummary = useMemo(
+    () => scopeSummaryLine(insurer, productType, variantName, retrievalOptions),
+    [insurer, productType, variantName, retrievalOptions],
+  );
 
   const runSearch = useCallback(async () => {
     setError(null);
@@ -321,9 +374,9 @@ export default function App() {
                   onChange={(e) => setInsurer(e.target.value)}
                 >
                   <option value="">Any</option>
-                  {insurerChoices.map((v) => (
-                    <option key={v} value={v}>
-                      {v}
+                  {insurerChoices.map((o) => (
+                    <option key={o.value} value={o.value}>
+                      {o.label}
                     </option>
                   ))}
                 </select>
@@ -340,9 +393,9 @@ export default function App() {
                   onChange={(e) => setProductType(e.target.value)}
                 >
                   <option value="">Any</option>
-                  {productTypeChoices.map((v) => (
-                    <option key={v} value={v}>
-                      {v}
+                  {productTypeChoices.map((o) => (
+                    <option key={o.value} value={o.value}>
+                      {o.label}
                     </option>
                   ))}
                 </select>
@@ -363,9 +416,9 @@ export default function App() {
                   onChange={(e) => setVariantName(e.target.value)}
                 >
                   <option value="">Any</option>
-                  {variantChoices.map((v) => (
-                    <option key={v} value={v}>
-                      {v}
+                  {variantChoices.map((o) => (
+                    <option key={o.value} value={o.value}>
+                      {o.label}
                     </option>
                   ))}
                 </select>
@@ -408,7 +461,28 @@ export default function App() {
           </header>
 
           <div className="query-bar">
-            <label className="field field--grow">
+            <div className="example-chips" aria-label="Example evidence searches">
+              <p className="example-chips__title">
+                <span className="example-chips__title-en">Example evidence searches</span>
+                <span className="example-chips__title-ko" lang="ko">
+                  {" "}
+                  예시 근거 검색
+                </span>
+              </p>
+              <div className="example-chips__list">
+                {EXAMPLE_EVIDENCE_QUERIES.map((exampleQuery) => (
+                  <button
+                    key={exampleQuery}
+                    type="button"
+                    className="example-chip"
+                    onClick={() => setQuery(exampleQuery)}
+                  >
+                    {exampleQuery}
+                  </button>
+                ))}
+              </div>
+            </div>
+            <label className="field field--grow query-bar__query">
               <span className="field__label">Query</span>
               <textarea
                 className="query-textarea"

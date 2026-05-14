@@ -83,6 +83,9 @@ def test_citation_bundle_from_hits_ids_and_fields() -> None:
     assert c0.section_title == "제1조 (목적)"
     assert c0.insurer == INSURER_KYOBO
     assert c0.product_type == PRODUCT_TYPE_ANNUITY
+    assert c0.insurer_display_name == "교보생명"
+    assert c0.product_type_display_name == "연금보험"
+    assert c0.product_display_name is not None
     assert c0.text == "본문 일부"
     assert c0.page_start == 3 and c0.page_end == 3
     assert c0.char_start == 100 and c0.char_end == 200

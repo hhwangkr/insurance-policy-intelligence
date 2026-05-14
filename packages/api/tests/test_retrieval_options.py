@@ -74,10 +74,22 @@ def test_retrieval_options_success_sorted_unique(tmp_path: Path) -> None:
     assert response.status_code == 200
     data = response.json()
     RetrievalOptionsResponse.model_validate(data)
-    assert data["insurers"] == ["kyobolife", "samsunglife"]
-    assert set(data["product_types"]) == {"annuity", "cancer"}
-    assert data["product_types"] == sorted(data["product_types"])
-    assert data["variant_names"] == ["기본형", "적립형"]
+    assert data["insurers"] == [
+        {"value": "kyobolife", "label": "교보생명"},
+        {"value": "samsunglife", "label": "삼성생명"},
+    ]
+    assert {p["value"] for p in data["product_types"]} == {"annuity", "cancer"}
+    assert [p["value"] for p in data["product_types"]] == sorted(
+        [p["value"] for p in data["product_types"]],
+    )
+    assert data["product_types"] == [
+        {"value": "annuity", "label": "연금보험"},
+        {"value": "cancer", "label": "암보험"},
+    ]
+    assert data["variant_names"] == [
+        {"value": "기본형", "label": "기본형"},
+        {"value": "적립형", "label": "적립형"},
+    ]
 
 
 def test_retrieval_options_missing_metadata_404(tmp_path: Path) -> None:

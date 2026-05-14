@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from pathlib import Path
@@ -10,7 +11,13 @@ import numpy as np
 
 from insurance_ai_retrieval.chunks_io import flatten_chunks_sorted, load_chunk_artifacts_from_dir
 from insurance_ai_retrieval.embedder import PassageEmbedder
-from insurance_ai_retrieval.metadata import ChunkMetadataRecord, enrich_chunk_metadata
+from insurance_ai_retrieval.metadata import (
+    ChunkMetadataRecord,
+    display_label_for_insurer,
+    display_label_for_product_name,
+    display_label_for_product_type,
+    enrich_chunk_metadata,
+)
 
 EMBEDDINGS_FILENAME = "chunk_embeddings.npy"
 METADATA_FILENAME = "chunk_metadata.jsonl"
@@ -213,10 +220,11 @@ def load_metadata_rows(index_dir: Path) -> list[ChunkMetadataRecord]:
     return _read_jsonl(path)
 
 
-def collect_index_filter_options(index_dir: Path) -> dict[str, list[str]]:
-    """Return sorted unique non-empty metadata values from the index (for filter UIs).
+def collect_index_filter_options(index_dir: Path) -> dict[str, list[dict[str, str]]]:
+    """Return sorted unique non-empty metadata values as ``value`` / ``label`` pairs.
 
     Reads ``chunk_metadata.jsonl`` via :func:`load_metadata_rows` (same file as search).
+    Canonical ``value`` strings match :class:`SearchFilters`; ``label`` is user-facing.
     """
     meta = load_metadata_rows(index_dir)
     insurers: set[str] = set()
@@ -236,12 +244,19 @@ def collect_index_filter_options(index_dir: Path) -> dict[str, list[str]]:
             variant_names.add(rec.variant_name)
         if rec.policy_unit_name:
             policy_unit_names.add(rec.policy_unit_name)
+
+    def _pairs(values: set[str], label_fn: Callable[[str], str]) -> list[dict[str, str]]:
+        return [{"value": v, "label": label_fn(v)} for v in sorted(values)]
+
+    def _pairs_identity(values: set[str]) -> list[dict[str, str]]:
+        return [{"value": v, "label": v} for v in sorted(values)]
+
     return {
-        "insurers": sorted(insurers),
-        "product_types": sorted(product_types),
-        "product_names": sorted(product_names),
-        "variant_names": sorted(variant_names),
-        "policy_unit_names": sorted(policy_unit_names),
+        "insurers": _pairs(insurers, display_label_for_insurer),
+        "product_types": _pairs(product_types, display_label_for_product_type),
+        "product_names": _pairs(product_names, display_label_for_product_name),
+        "variant_names": _pairs_identity(variant_names),
+        "policy_unit_names": _pairs_identity(policy_unit_names),
     }
 
 

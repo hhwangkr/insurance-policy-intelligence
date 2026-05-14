@@ -95,7 +95,7 @@ uv run uvicorn insurance_ai_api.main:app --reload --host 127.0.0.1 --port 8765
 | Method | Path | Role |
 |--------|------|------|
 | `GET` | `/health` | Liveness |
-| `GET` | `/retrieval/options` | Unique `insurer` / `product_type` / `variant_name` / … values from `chunk_metadata.jsonl` (query `index_dir`, default `data/processed/index`) for UIs |
+| `GET` | `/retrieval/options` | Unique filter dimensions from `chunk_metadata.jsonl` as `{ "value": "<slug>", "label": "<Korean or fallback>" }` pairs (query `index_dir`, default `data/processed/index`) |
 | `POST` | `/retrieval/context` | Citation-ready bundle for a query |
 
 Example JSON body for **`POST /retrieval/context`** (typical web UI scope):
@@ -120,13 +120,13 @@ Example JSON body for **`POST /retrieval/context`** (typical web UI scope):
 }
 ```
 
-Invalid input → **400**; missing index → **404**; unexpected failure → **500** (`detail` in body when applicable).
+Invalid input → **400**; missing index → **404**; unexpected failure → **500** (`detail` in body when applicable). **Filters** (`POST /retrieval/context` body) always use **canonical slugs** (e.g. `kyobolife`, `annuity`); **display labels** (e.g. 교보생명, 연금보험) come from the retrieval metadata layer and appear in citation JSON and in **`GET /retrieval/options`** pairs for the web UI.
 
 ---
 
 ## Evidence Search (Web UI)
 
-**`apps/web`** — **Insurance Policy Evidence Search**: calls **`GET /retrieval/options`** to populate **insurer / product_type / variant_name** dropdowns from the current index, then **`POST /retrieval/context`** for results; **collapsed-by-default** raw JSON. The UI **defaults to `http://127.0.0.1:8765`** (no API URL in the main sidebar). Set **`VITE_API_BASE_URL`** at dev/build time if needed (copy `apps/web/.env.example` → `apps/web/.env`); a temporary override also lives under **Advanced** in the app.
+**`apps/web`** — **Insurance Policy Evidence Search**: **`GET /retrieval/options`** fills **insurer / product_type / variant_name** dropdowns using **Korean labels** while requests still send **canonical values**; **`POST /retrieval/context`** returns citations that include both. **Static example question chips** only fill the query field—no chat history or auto-search. **Collapsed-by-default** raw JSON. The UI **defaults to `http://127.0.0.1:8765`** (no API URL in the main sidebar). Set **`VITE_API_BASE_URL`** at dev/build time if needed (copy `apps/web/.env.example` → `apps/web/.env`); a temporary override also lives under **Advanced** in the app.
 
 ```bash
 cd apps/web

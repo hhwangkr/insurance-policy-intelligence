@@ -8,6 +8,7 @@ from pydantic import BaseModel, ConfigDict
 
 from insurance_ai_retrieval.embedder import PassageEmbedder
 from insurance_ai_retrieval.index_engine import SearchFilters, SearchHit, search_local_index
+from insurance_ai_retrieval.metadata import enrich_chunk_metadata
 
 
 def search_filters_to_mapping(filters: SearchFilters | None) -> dict[str, Any]:
@@ -41,6 +42,9 @@ class CitationContextEntry(BaseModel):
     document_id: str
     insurer: str | None = None
     product_type: str | None = None
+    insurer_display_name: str | None = None
+    product_type_display_name: str | None = None
+    product_display_name: str | None = None
     policy_unit_name: str | None = None
     variant_name: str | None = None
     page_start: int
@@ -74,7 +78,7 @@ def citation_bundle_from_hits(
     """Map ranked ``SearchHit`` rows to ``C1``… citation entries (no network / LLM)."""
     entries: list[CitationContextEntry] = []
     for i, hit in enumerate(hits):
-        m = hit.metadata
+        m = enrich_chunk_metadata(hit.metadata)
         entries.append(
             CitationContextEntry(
                 citation_id=f"C{i + 1}",
@@ -85,6 +89,9 @@ def citation_bundle_from_hits(
                 document_id=m.document_id,
                 insurer=m.insurer,
                 product_type=m.product_type,
+                insurer_display_name=m.insurer_display_name,
+                product_type_display_name=m.product_type_display_name,
+                product_display_name=m.product_display_name,
                 policy_unit_name=m.policy_unit_name,
                 variant_name=m.variant_name,
                 page_start=m.page_start,

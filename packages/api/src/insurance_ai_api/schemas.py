@@ -71,13 +71,22 @@ class RetrievalContextRequest(BaseModel):
         return Path(self.index_dir).expanduser()
 
 
+class FilterOptionPair(BaseModel):
+    """Canonical filter ``value`` with user-facing ``label`` (e.g. slug + Korean name)."""
+
+    model_config = ConfigDict(str_strip_whitespace=True)
+
+    value: str
+    label: str
+
+
 class RetrievalOptionsResponse(BaseModel):
     """GET ``/retrieval/options`` — unique metadata values from ``chunk_metadata.jsonl``."""
 
     model_config = ConfigDict(str_strip_whitespace=True)
 
-    insurers: list[str] = Field(default_factory=list)
-    product_types: list[str] = Field(default_factory=list)
-    product_names: list[str] = Field(default_factory=list)
-    variant_names: list[str] = Field(default_factory=list)
-    policy_unit_names: list[str] = Field(default_factory=list)
+    insurers: list[FilterOptionPair] = Field(default_factory=list)
+    product_types: list[FilterOptionPair] = Field(default_factory=list)
+    product_names: list[FilterOptionPair] = Field(default_factory=list)
+    variant_names: list[FilterOptionPair] = Field(default_factory=list)
+    policy_unit_names: list[FilterOptionPair] = Field(default_factory=list)
