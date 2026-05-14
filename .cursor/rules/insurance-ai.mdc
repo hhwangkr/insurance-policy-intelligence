@@ -86,8 +86,8 @@ alwaysApply: true
 
 Use this layout; do not introduce parallel top-level `routers/`, `services/`, `agents/`, etc. outside the apps and packages below.
 
-- **apps/api/** — FastAPI app, routers, configuration, dependency injection, lifespan
 - **apps/web/** — Next.js UI (scaffolding; not the MVP focus)
+- **packages/api/** — FastAPI: `GET /health`, `POST /retrieval/context` (citation bundle)
 - **packages/retrieval/** — Local dense index, metadata-scoped search, citation context bundle, retrieval evaluation
 - **packages/ingestion/** — PDF parsing, loading, normalization, section detection, chunking
 - **packages/evaluation/** — Reserved evaluation package surface

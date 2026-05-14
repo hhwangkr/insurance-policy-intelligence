@@ -47,10 +47,10 @@ Retrieval evaluation (YAML-driven)
 
 ```text
 apps/
-  api/            # FastAPI backend (health, minimal surface)
   web/            # Frontend app (scaffolding / out of MVP focus)
 
 packages/
+  api/            # FastAPI: health + citation-ready retrieval context
   ingestion/      # PDF ingestion, sections, chunking
   retrieval/      # Index, search, citation context, retrieval eval
   evaluation/     # Evaluation pipelines (reserved)
@@ -112,6 +112,7 @@ infra/
 - Local dense semantic retrieval over chunks, with **metadata-scoped search** (insurer, product type, optional variant)
 - **Citation context** (`CitationContextBundle`) built at query time via `build_citation_context`
 - **Retrieval evaluation harness** driven by [`data/eval/retrieval_queries.yaml`](data/eval/retrieval_queries.yaml) (see [`docs/testing_strategy.md`](docs/testing_strategy.md) and [`docs/retrieval_baseline.md`](docs/retrieval_baseline.md))
+- **HTTP API** (`packages/api`): `GET /health`, `POST /retrieval/context` — same citation bundle as the CLI; **not** an LLM answer endpoint
 
 **Not yet / out of scope for this MVP**
 
@@ -259,6 +260,44 @@ Cases live in [`data/eval/retrieval_queries.yaml`](data/eval/retrieval_queries.y
 
 ---
 
+## HTTP API (Phase 3A)
+
+The **`packages/api`** service exposes citation-ready retrieval context over HTTP (same `build_citation_context` path as the CLI). Responses are **`CitationContextBundle` JSON**—ranked passages with `C1`, `C2`, … handles and metadata—**not** LLM-authored answers.
+
+A simple evidence-search frontend can be added later on top of this API.
+
+Run from the repository root (the POST handler loads the embedding model and index from disk **per request** for now; ensure step **H** has produced `data/processed/index`):
+
+```bash
+uv run uvicorn insurance_ai_api.main:app --reload
+```
+
+Example request body for `POST /retrieval/context`:
+
+```json
+{
+  "query": "보험금 지급이 늦어지면 이자는 어떻게 계산돼?",
+  "index_dir": "data/processed/index",
+  "filters": {
+    "document_id": null,
+    "insurer": "kyobolife",
+    "product_type": "annuity",
+    "product_name": null,
+    "policy_unit_name": null,
+    "variant_name": "적립형",
+    "include_section_types": null,
+    "exclude_section_types": [],
+    "use_default_section_type_excludes": true
+  },
+  "top_k": 5,
+  "dedupe_section": true
+}
+```
+
+**Errors:** invalid filters or empty candidate sets typically yield **400** with a `detail` string; a missing index directory or `index_config.json` yields **404**; unexpected failures yield **500**.
+
+---
+
 ## Testing and evaluation strategy
 
 - **`pytest`** (under `packages/*/tests/`) should mostly guard **reusable pipeline invariants** (schemas, filters, deterministic citation handles)—not every product-specific section title.
@@ -278,7 +317,7 @@ Install dependencies:
 uv sync
 ```
 
-Run backend:
+Run backend (same as [HTTP API](#http-api-phase-3a)):
 
 ```bash
 uv run uvicorn insurance_ai_api.main:app --reload

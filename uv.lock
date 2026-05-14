@@ -487,29 +487,17 @@ wheels = [
 [[package]]
 name = "insurance-ai-api"
 version = "0.1.0"
-source = { editable = "apps/api" }
+source = { editable = "packages/api" }
 dependencies = [
     { name = "fastapi" },
-    { name = "insurance-ai-shared" },
-    { name = "opentelemetry-api" },
-    { name = "opentelemetry-exporter-otlp-proto-http" },
-    { name = "opentelemetry-instrumentation-fastapi" },
-    { name = "opentelemetry-sdk" },
-    { name = "pydantic-settings" },
-    { name = "structlog" },
+    { name = "insurance-ai-retrieval" },
     { name = "uvicorn", extra = ["standard"] },
 ]
 
 [package.metadata]
 requires-dist = [
     { name = "fastapi", specifier = ">=0.115" },
-    { name = "insurance-ai-shared", editable = "packages/shared" },
-    { name = "opentelemetry-api", specifier = ">=1.28" },
-    { name = "opentelemetry-exporter-otlp-proto-http", specifier = ">=1.28" },
-    { name = "opentelemetry-instrumentation-fastapi", specifier = ">=0.49b0" },
-    { name = "opentelemetry-sdk", specifier = ">=1.28" },
-    { name = "pydantic-settings", specifier = ">=2.7" },
-    { name = "structlog", specifier = ">=24.4" },
+    { name = "insurance-ai-retrieval", editable = "packages/retrieval" },
     { name = "uvicorn", extras = ["standard"], specifier = ">=0.32" },
 ]
 
@@ -594,7 +582,7 @@ dev = [
 dev = [
     { name = "annotated-doc", specifier = ">=0.0.4" },
     { name = "httpx", specifier = ">=0.28" },
-    { name = "insurance-ai-api", editable = "apps/api" },
+    { name = "insurance-ai-api", editable = "packages/api" },
     { name = "insurance-ai-ingestion", editable = "packages/ingestion" },
     { name = "insurance-ai-retrieval", editable = "packages/retrieval" },
     { name = "insurance-ai-shared", editable = "packages/shared" },
