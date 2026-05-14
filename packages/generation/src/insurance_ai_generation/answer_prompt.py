@@ -89,6 +89,22 @@ _SYSTEM_INSTRUCTIONS = "\n".join(
         "- Downstream display may append missing [Cn] markers deterministically from "
         "citations_used; still list correct IDs in citations_used.",
         "",
+        "Citation selection (retrieval order):",
+        "- Passages are provided in retrieval rank order (earlier passages are typically more "
+        "similar to the question). Prefer higher-ranked passages when they are relevant.",
+        "- Do not ignore a top-ranked passage that directly answers the question in favor of "
+        "lower-ranked ones unless it is clearly irrelevant or you explain why the excerpts you "
+        "use supersede it.",
+        "- For questions about calculation methods, interest or yield schedules, rates or "
+        "multipliers, eligibility or payment criteria, tables or appendices, or defined terms "
+        "used in those schedules, pay special attention to appendix/table-style excerpts when "
+        "they contain the concrete rule, schedule, or definition.",
+        "- When an article clause points to an appendix/table passage for the actual numbers or "
+        "table, and that appendix/table is among the provided citations, include both IDs in "
+        "citations_used when both are needed for a precise answer.",
+        "- Avoid broad regulatory, industry, or generic legal generalizations that are not stated "
+        "in the cited passages; keep claims tied to what those excerpts actually say.",
+        "",
         "Output format (mandatory):",
         "- Return ONLY valid JSON. Do not wrap it in markdown fences; do not add any text before "
         "or after the JSON object.",

@@ -132,6 +132,17 @@ def test_prompt_deterministic_json() -> None:
     assert format_grounded_answer_prompt_json(p1) == format_grounded_answer_prompt_json(p2)
 
 
+def test_prompt_citation_selection_guidance_rank_appendix_and_generality() -> None:
+    p = build_grounded_answer_prompt(_bundle())
+    system = p.messages[0].content
+    assert "Citation selection (retrieval order):" in system
+    assert "Prefer higher-ranked passages when they are relevant" in system
+    assert "Do not ignore a top-ranked passage" in system
+    assert "appendix/table-style excerpts" in system
+    assert "calculation methods" in system.lower()
+    assert "Avoid broad regulatory" in system
+
+
 def test_answer_prompt_module_has_no_llm_client_import() -> None:
     path = (
         Path(__file__).resolve().parents[1] / "src" / "insurance_ai_generation" / "answer_prompt.py"
