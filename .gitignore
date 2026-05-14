@@ -45,6 +45,9 @@ data/processed/sections/*.json
 # Generated ingestion quality reports (optional markdown output from inspect_documents)
 data/processed/reports/*.md
 
+# Optional query-time citation context JSON (debug / examples only; see README and docs/retrieval_baseline.md)
+data/processed/reports/*citation_context*.json
+
 # Generated chunk artifacts
 data/processed/chunks/*.chunks.json
 !data/processed/chunks/.gitkeep

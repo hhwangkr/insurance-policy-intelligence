@@ -216,6 +216,31 @@ Each hit is backed by a `ChunkMetadataRecord` (mirroring `DocumentChunk` fields 
 
 Older `chunk_metadata.jsonl` rows without the new fields are **enriched at search time** from `document_id`, but **rebuilding the index** after upgrading packages repopulates JSONL eagerly.
 
+## Citation context bundle (`build_citation_context`)
+
+The CLI `insurance_ai_retrieval.build_citation_context` runs **metadata-scoped dense retrieval** (same filter semantics as `search_index`) and prints a **JSON bundle**: user query, filter snapshot, `top_k`, `dedupe_section`, and a `citations` array with stable handles `C1`, `C2`, … plus chunk metadata and **full** `text` for each hit.
+
+**Lifecycle:** a citation context is a **query-time** object. In production or a normal interactive flow you build it **in memory** (Python: `build_citation_context` from `insurance_ai_retrieval.citation_context`) and pass it to prompt / answer generation. It is **not** a pre-generated static artifact like chunks or the index.
+
+**Default:** JSON goes to **stdout** only.
+
+**`--output-path`:** optional. Use only for **debugging**, **saved examples**, or **reproducible inspection**. Those files are **not** part of the tracked dataset; a narrow gitignore pattern covers typical names under `data/processed/reports/`.
+
+### Example (stdout only)
+
+```bash
+uv run python -m insurance_ai_retrieval.build_citation_context \
+  --index-dir data/processed/index \
+  --insurer kyobolife \
+  --product-type annuity \
+  --variant-name 적립형 \
+  --query "보험금 지급이 늦어지면 이자는 어떻게 계산돼?" \
+  --top-k 5 \
+  --dedupe-section
+```
+
+Filter flags match **`search_index`** (`--document-id`, `--product-name`, `--policy-unit-name`, section-type overrides, etc.). There is **no LLM** call in this CLI.
+
 ## Known limitations
 
 - **Embedding quality** depends on the chosen model and chunk text (Korean layout quirks, OCR noise).

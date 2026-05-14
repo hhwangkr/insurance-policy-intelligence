@@ -45,7 +45,10 @@ def main(argv: list[str] | None = None) -> int:
         "--output-path",
         type=Path,
         default=None,
-        help="Optional path to write the same JSON as stdout (UTF-8).",
+        help=(
+            "Optional debug output path for saving the query-time context bundle "
+            "(same JSON as stdout, UTF-8). Not a normal pipeline artifact."
+        ),
     )
     parser.add_argument("--document-id", type=str, default=None)
     parser.add_argument("--insurer", type=str, default=None)
