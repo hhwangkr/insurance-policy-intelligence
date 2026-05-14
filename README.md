@@ -63,7 +63,7 @@ apps/
 packages/
   ingestion/      # PDF ingestion
   retrieval/      # Search/retrieval, citation context
-  generation/     # Grounded prompt / answer schema / future LLM providers (no LLM calls yet)
+  generation/     # Grounded prompt, answer schema, LLMProvider contract (mocks only; no live APIs)
   evaluation/     # Evaluation pipelines (reserved)
   shared/         # Shared models/types
 
@@ -122,6 +122,7 @@ infra/
 - Section-aware chunking
 - Local dense semantic retrieval over chunks, with **metadata-scoped search** (insurer, product type, optional variant)
 - **Retrieval evaluation harness** driven by a **curated YAML query set** at [`data/eval/retrieval_queries.yaml`](data/eval/retrieval_queries.yaml) (see [`docs/retrieval_baseline.md`](docs/retrieval_baseline.md) for methodology and extra smoke examples)
+- **Generation layer:** grounded prompt + **`GroundedAnswer`** validation, plus a **provider-agnostic `LLMProvider`** contract and **`generate_grounded_answer`** (static/mock providers only; no vendor SDKs or API keys)
 
 **Not yet**
 

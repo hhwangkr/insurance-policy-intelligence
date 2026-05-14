@@ -1,7 +1,7 @@
 [project]
 name = "insurance-ai-generation"
 version = "0.1.0"
-description = "Grounded prompt construction, answer schema, and future LLM provider layer (no LLM calls yet)."
+description = "Grounded prompt construction, provider-agnostic LLM contract, and answer validation (mock providers only until real SDKs are wired)."
 requires-python = ">=3.12"
 dependencies = [
     "insurance-ai-retrieval",

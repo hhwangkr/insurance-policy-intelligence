@@ -248,7 +248,7 @@ This is the intended integration shape (all **in memory**; no required intermedi
 1. User query + metadata filters (`SearchFilters`).
 2. `search_local_index` (or `build_citation_context`, which calls it with an embedder) → **`CitationContextBundle`** in RAM.
 3. `build_grounded_answer_prompt(bundle)` from `insurance_ai_generation.answer_prompt` → **`GroundedAnswerPrompt`** (system + user messages).
-4. **Future step:** send `GroundedAnswerPrompt.messages` to your LLM provider (not implemented in this repo phase).
+4. **`generate_grounded_answer`** (`insurance_ai_generation.generate_grounded_answer`) with an **`LLMProvider`** implementation: send messages, parse **`GroundedAnswer`**, run **`validate_answer_citations`** against `prompt.citation_ids`. Today only **static/mock** providers exist; vendor SDKs are added later.
 
 Application code should call these Python functions directly; do not rely on shell round-trips through the filesystem for normal requests.
 
@@ -272,6 +272,8 @@ uv run python -m insurance_ai_generation.build_answer_prompt \
 ### Grounded answer schema and citation validation (Phase 2H-1, no LLM)
 
 `insurance_ai_generation.grounded_answer` defines a small **`GroundedAnswer`** model (prose + `citations_used` + `insufficient_context`) and **`validate_answer_citations`** / **`extract_citation_ids_from_text`** to detect invented `[C…]` markers, mismatches between body and `citations_used`, and empty or uncited answers when the model claims sufficient context. Use this **before or after** a future LLM call to guard rails—still **no LLM** and no provider SDKs in that module.
+
+**Phase 2H-2 (serving contract):** `insurance_ai_generation.llm_provider` exposes **`LLMRequest`** / **`LLMResponse`** and an **`LLMProvider`** protocol; **`StaticLLMProvider`** supports tests and offline demos. **`generate_grounded_answer`** wires prompt → provider → parse (JSON-first, plaintext fallback) → citation validation. **No live HTTP calls** or third-party SDK dependencies in this phase—real providers plug in behind the same interface later.
 
 ## Known limitations
 
