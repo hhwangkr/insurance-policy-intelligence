@@ -11,6 +11,7 @@ managed = true
 [tool.uv.sources]
 insurance-ai-api = { workspace = true }
 insurance-ai-ingestion = { workspace = true }
+insurance-ai-retrieval = { workspace = true }
 insurance-ai-shared = { workspace = true }
 
 [tool.uv.workspace]
@@ -29,6 +30,7 @@ dev = [
     "httpx>=0.28",
     "insurance-ai-api",
     "insurance-ai-ingestion",
+    "insurance-ai-retrieval",
     "insurance-ai-shared",
     "mypy>=1.13",
     "pre-commit>=4.0",
@@ -43,12 +45,13 @@ dev = [
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
 asyncio_default_fixture_loop_scope = "function"
-testpaths = ["apps/api/tests", "scripts/tests", "packages/ingestion/tests"]
+testpaths = ["apps/api/tests", "scripts/tests", "packages/ingestion/tests", "packages/retrieval/tests"]
 pythonpath = [
     "apps/api/src",
     "scripts",
     "packages/shared/src",
     "packages/ingestion/src",
+    "packages/retrieval/src",
 ]
 
 [tool.ruff]
@@ -113,4 +116,8 @@ ignore_missing_imports = true
 
 [[tool.mypy.overrides]]
 module = ["yaml"]
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+module = ["sentence_transformers.*", "transformers.*"]
 ignore_missing_imports = true

@@ -37,3 +37,7 @@ This note describes the **deterministic** Korean policy PDF section pipeline in 
 ## Section-aware chunking (Phase 2E)
 
 Deterministic chunking reads ``data/processed/sections/*.sections.json`` and writes ``data/processed/chunks/*.chunks.json`` via ``uv run python -m insurance_ai_ingestion.chunk_sections``. Each chunk is confined to a single ``DocumentSection`` (no cross-section merges). ``DocumentChunk.page_start`` / ``page_end`` inherit the section’s page span until per-chunk page mapping exists.
+
+## Local retrieval baseline (Phase 2F)
+
+Dense retrieval over chunk JSON (local embeddings + numpy index) is documented in [`retrieval_baseline.md`](retrieval_baseline.md). It does not add answer generation or hosted vector DBs.

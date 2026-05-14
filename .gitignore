@@ -48,3 +48,7 @@ data/processed/reports/*.md
 # Generated chunk artifacts
 data/processed/chunks/*.chunks.json
 !data/processed/chunks/.gitkeep
+
+# Local vector index (retrieval baseline; build_index output)
+data/processed/index/*
+!data/processed/index/.gitkeep

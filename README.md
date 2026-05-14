@@ -126,6 +126,7 @@ infra/
 - PDF ingestion pipeline
 - Metadata extraction
 - Semantic chunking
+- Local retrieval baseline over chunk artifacts ([`docs/retrieval_baseline.md`](docs/retrieval_baseline.md))
 
 ### Planned
 
@@ -169,6 +170,8 @@ This repo keeps a **reproducible paper trail** for public disclosure PDFs:
 | Normalized staged PDFs | `data/raw/manual/*.pdf` | **Tracked** hash-based keys used as ingestion inputs (`manifest.source_file`). |
 | Lineage + semantics | `data/manifests/manual.yaml` | **Tracked** mapping between `original_filename`, normalized `source_file`, `content_hash`, and labels. |
 | Generated outputs | `data/processed/documents/*.json` | **Not tracked** (large, noisy); regenerate locally. |
+| Chunk JSON (generated) | `data/processed/chunks/*.chunks.json` | **Not tracked**; run `insurance_ai_ingestion.chunk_sections` (see `docs/retrieval_baseline.md`). |
+| Local dense index | `data/processed/index/` | **Not tracked** except `.gitkeep`; run `insurance_ai_retrieval.build_index` (see `docs/retrieval_baseline.md`). |
 | Portfolio sample | `examples/processed_documents/` | **Tracked** small schema exemplar. |
 
 **Tradeoff:** storing both inbox originals and normalized copies **duplicates bytes** in git for the
