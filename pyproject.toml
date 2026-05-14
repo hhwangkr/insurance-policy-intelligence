@@ -19,7 +19,6 @@ members = [
     "apps/api",
     "packages/shared",
     "packages/evaluation",
-    "packages/agents",
     "packages/retrieval",
     "packages/ingestion",
 ]
@@ -61,7 +60,6 @@ src = [
     "apps/api/src",
     "packages/shared/src",
     "packages/evaluation/src",
-    "packages/agents/src",
     "packages/retrieval/src",
     "packages/ingestion/src",
     "scripts",
@@ -85,7 +83,6 @@ files = [
     "apps/api/src",
     "packages/shared/src",
     "packages/evaluation/src",
-    "packages/agents/src",
     "packages/retrieval/src",
     "packages/ingestion/src",
     "scripts/staging_lib.py",
@@ -99,8 +96,8 @@ mypy_path = [
     "apps/api/src",
     "packages/shared/src",
     "packages/evaluation/src",
-    "packages/agents/src",
     "packages/retrieval/src",
+    "packages/retrieval/tests",
     "packages/ingestion/src",
     "scripts",
 ]

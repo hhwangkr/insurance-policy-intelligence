@@ -61,10 +61,9 @@ apps/
   web/            # Frontend app
 
 packages/
-  agents/         # LangGraph workflows
   ingestion/      # PDF ingestion
   retrieval/      # Search/retrieval
-  evaluation/     # Evaluation pipelines
+  evaluation/     # Evaluation pipelines (reserved)
   shared/         # Shared models/types
 
 data/
