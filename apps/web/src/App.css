@@ -205,6 +205,46 @@ body {
   align-items: flex-end;
 }
 
+.advanced-panel {
+  flex-shrink: 0;
+  padding: 0 1rem 0.55rem;
+  border-bottom: 1px solid #eef0f4;
+  background: #fbfcfe;
+  font-size: 0.8rem;
+}
+
+.advanced-panel__summary {
+  cursor: pointer;
+  font-weight: 600;
+  color: #5c6578;
+  user-select: none;
+  list-style-position: outside;
+}
+
+.advanced-panel__summary:hover {
+  color: #1e5a96;
+}
+
+.advanced-panel__body {
+  margin-top: 0.45rem;
+  padding-top: 0.45rem;
+  border-top: 1px dashed #e1e5ed;
+}
+
+.advanced-panel__hint {
+  margin: 0.35rem 0 0;
+  font-size: 0.72rem;
+  color: #6b7280;
+  line-height: 1.35;
+}
+
+.advanced-panel__hint code {
+  font-size: 0.68rem;
+  background: #f3f4f6;
+  padding: 0.06rem 0.2rem;
+  border-radius: 4px;
+}
+
 .btn-primary {
   font: inherit;
   font-size: 0.85rem;
@@ -258,6 +298,10 @@ body {
 .state__body {
   line-height: 1.45;
   opacity: 0.95;
+}
+
+.state__body--multiline {
+  white-space: pre-line;
 }
 
 .state--error {

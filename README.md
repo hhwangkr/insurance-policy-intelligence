@@ -123,7 +123,7 @@ Invalid input → **400**; missing index → **404**; unexpected failure → **5
 
 ## Evidence Search (Web UI)
 
-**`apps/web`** — **Insurance Policy Evidence Search**: calls **`POST /retrieval/context`**, shows citation cards and a **collapsed-by-default** raw JSON panel. **Default API** is **`http://127.0.0.1:8765`** (same as the command above). Override with build-time **`VITE_API_BASE_URL`** or the **API base URL** field in the sidebar for other hosts.
+**`apps/web`** — **Insurance Policy Evidence Search**: calls **`POST /retrieval/context`**, shows citation cards and a **collapsed-by-default** raw JSON panel. The UI **defaults to `http://127.0.0.1:8765`** (no API URL in the main sidebar). Set **`VITE_API_BASE_URL`** at dev/build time if needed (copy `apps/web/.env.example` → `apps/web/.env`); a temporary override also lives under **Advanced** in the app.
 
 ```bash
 cd apps/web

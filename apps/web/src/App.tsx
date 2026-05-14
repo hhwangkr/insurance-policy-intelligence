@@ -29,9 +29,27 @@ type CitationBundle = {
   citations: CitationEntry[];
 };
 
-const defaultApiBase = import.meta.env.VITE_API_BASE_URL ?? "http://127.0.0.1:8765";
+function normalizeApiBase(raw: string): string {
+  return raw.trim().replace(/\/+$/, "");
+}
 
 const PREVIEW_CHARS = 280;
+
+const API_REACH_HELP =
+  "Could not reach the retrieval API at {url}. Make sure the API is running:\n\nuv run uvicorn insurance_ai_api.main:app --host 127.0.0.1 --port 8765";
+
+function isLikelyFetchNetworkError(e: unknown): boolean {
+  if (e instanceof TypeError) {
+    return true;
+  }
+  if (e instanceof Error) {
+    if (e.name === "AbortError") {
+      return true;
+    }
+    return /failed to fetch|networkerror|load failed|network request failed/i.test(e.message);
+  }
+  return false;
+}
 
 function CitationCard({ c }: { c: CitationEntry }) {
   const [expanded, setExpanded] = useState(false);
@@ -64,7 +82,17 @@ function CitationCard({ c }: { c: CitationEntry }) {
 }
 
 export default function App() {
-  const [apiBase, setApiBase] = useState(defaultApiBase);
+  const viteApiDefault = useMemo(
+    () => normalizeApiBase(import.meta.env.VITE_API_BASE_URL ?? "http://127.0.0.1:8765"),
+    [],
+  );
+  const [apiBaseOverride, setApiBaseOverride] = useState("");
+  const apiBaseUrl = useMemo(
+    () =>
+      apiBaseOverride.trim() ? normalizeApiBase(apiBaseOverride) : viteApiDefault,
+    [apiBaseOverride, viteApiDefault],
+  );
+
   const [indexDir, setIndexDir] = useState("data/processed/index");
   const [query, setQuery] = useState(
     "보험금 지급이 늦어지면 이자는 어떻게 계산돼?",
@@ -95,8 +123,7 @@ export default function App() {
     setError(null);
     setBundle(null);
     setLoading(true);
-    const base = apiBase.replace(/\/+$/, "");
-    const url = `${base}/retrieval/context`;
+    const url = `${apiBaseUrl}/retrieval/context`;
     const body = {
       query: query.trim(),
       index_dir: indexDir.trim(),
@@ -138,12 +165,16 @@ export default function App() {
       }
       setBundle(data as CitationBundle);
     } catch (e) {
-      setError(e instanceof Error ? e.message : String(e));
+      if (isLikelyFetchNetworkError(e)) {
+        setError(API_REACH_HELP.replace("{url}", apiBaseUrl));
+      } else {
+        setError(e instanceof Error ? e.message : String(e));
+      }
     } finally {
       setLoading(false);
     }
   }, [
-    apiBase,
+    apiBaseUrl,
     dedupeSection,
     indexDir,
     insurer,
@@ -158,17 +189,7 @@ export default function App() {
       <div className="app-inner">
         <aside className="sidebar" aria-label="Search scope and filters">
           <div className="sidebar__block">
-            <h2 className="sidebar__heading">Connection</h2>
-            <label className="field">
-              <span className="field__label">API base URL</span>
-              <input
-                type="text"
-                value={apiBase}
-                onChange={(e) => setApiBase(e.target.value)}
-                autoComplete="off"
-                spellCheck={false}
-              />
-            </label>
+            <h2 className="sidebar__heading">Index</h2>
             <label className="field">
               <span className="field__label">index_dir (server)</span>
               <input
@@ -178,9 +199,7 @@ export default function App() {
                 spellCheck={false}
               />
             </label>
-            <p className="sidebar__hint">
-              Optional build override: <code>VITE_API_BASE_URL</code>
-            </p>
+            <p className="sidebar__hint">Path as seen by the API process (repo root when running uvicorn locally).</p>
           </div>
 
           <div className="sidebar__block">
@@ -257,11 +276,32 @@ export default function App() {
             </div>
           </div>
 
+          <details className="advanced-panel">
+            <summary className="advanced-panel__summary">Advanced</summary>
+            <div className="advanced-panel__body">
+              <label className="field">
+                <span className="field__label">API base URL override (optional)</span>
+                <input
+                  type="text"
+                  value={apiBaseOverride}
+                  onChange={(e) => setApiBaseOverride(e.target.value)}
+                  placeholder={viteApiDefault}
+                  autoComplete="off"
+                  spellCheck={false}
+                />
+              </label>
+              <p className="advanced-panel__hint">
+                Leave empty to use <code>VITE_API_BASE_URL</code> from the build (default{" "}
+                <code>http://127.0.0.1:8765</code>). See <code>apps/web/.env.example</code>.
+              </p>
+            </div>
+          </details>
+
           <div className="main-scroll">
             {error ? (
               <div className="state state--error" role="alert">
                 <div className="state__title">Request failed</div>
-                <div className="state__body">{error}</div>
+                <div className="state__body state__body--multiline">{error}</div>
               </div>
             ) : null}
 
