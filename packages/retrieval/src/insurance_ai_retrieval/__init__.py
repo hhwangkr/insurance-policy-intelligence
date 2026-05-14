@@ -1,11 +1,5 @@
 """Local retrieval baselines (Phase 2F: numpy dot-product index over chunk embeddings)."""
 
-from insurance_ai_retrieval.answer_prompt import (
-    ChatMessage,
-    GroundedAnswerPrompt,
-    build_grounded_answer_prompt,
-    format_grounded_answer_prompt_json,
-)
 from insurance_ai_retrieval.chunks_io import flatten_chunks_sorted, load_chunk_artifacts_from_dir
 from insurance_ai_retrieval.citation_context import (
     CitationContextBundle,
@@ -17,12 +11,6 @@ from insurance_ai_retrieval.citation_context import (
 )
 from insurance_ai_retrieval.e5_text import format_e5_passage, format_e5_query
 from insurance_ai_retrieval.embedder import LocalSentenceTransformerEmbedder, PassageEmbedder
-from insurance_ai_retrieval.grounded_answer import (
-    GroundedAnswer,
-    GroundedAnswerValidation,
-    extract_citation_ids_from_text,
-    validate_answer_citations,
-)
 from insurance_ai_retrieval.index_engine import (
     IndexConfig,
     SearchFilters,
@@ -36,26 +24,19 @@ from insurance_ai_retrieval.index_engine import (
 from insurance_ai_retrieval.metadata import ChunkMetadataRecord
 
 __all__ = [
-    "ChatMessage",
     "CitationContextBundle",
     "CitationContextEntry",
     "ChunkMetadataRecord",
     "IndexConfig",
     "LocalSentenceTransformerEmbedder",
     "PassageEmbedder",
-    "GroundedAnswer",
-    "GroundedAnswerPrompt",
-    "GroundedAnswerValidation",
     "SearchFilters",
     "SearchHit",
     "build_citation_context",
-    "build_grounded_answer_prompt",
     "build_local_index",
     "citation_bundle_from_hits",
-    "extract_citation_ids_from_text",
     "flatten_chunks_sorted",
     "format_citation_bundle_json",
-    "format_grounded_answer_prompt_json",
     "format_e5_passage",
     "format_e5_query",
     "load_chunk_artifacts_from_dir",
@@ -64,5 +45,4 @@ __all__ = [
     "load_metadata_rows",
     "search_filters_to_mapping",
     "search_local_index",
-    "validate_answer_citations",
 ]

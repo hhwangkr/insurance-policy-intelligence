@@ -1,6 +1,8 @@
 from __future__ import annotations
 
-from insurance_ai_retrieval.grounded_answer import (
+from pathlib import Path
+
+from insurance_ai_generation.grounded_answer import (
     GroundedAnswer,
     extract_citation_ids_from_text,
     validate_answer_citations,
@@ -105,12 +107,10 @@ def test_validation_sorted_lists_deterministic() -> None:
 
 
 def test_grounded_answer_module_no_llm_strings() -> None:
-    from pathlib import Path
-
     path = (
         Path(__file__).resolve().parents[1]
         / "src"
-        / "insurance_ai_retrieval"
+        / "insurance_ai_generation"
         / "grounded_answer.py"
     )
     src = path.read_text(encoding="utf-8").lower()

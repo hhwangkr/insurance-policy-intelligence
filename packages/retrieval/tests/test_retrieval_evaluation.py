@@ -22,9 +22,7 @@ from insurance_ai_retrieval.retrieval_evaluation import (
     write_report,
 )
 
-_KYOBO_DOC = (
-    "kyobolife_annuity_kyobo_ro_annuity_insurance_policy_terms_20260101_080b9e62"
-)
+_KYOBO_DOC = "kyobolife_annuity_kyobo_ro_annuity_insurance_policy_terms_20260101_080b9e62"
 
 
 def _meta(

@@ -1,0 +1,21 @@
+[project]
+name = "insurance-ai-generation"
+version = "0.1.0"
+description = "Grounded prompt construction, answer schema, and future LLM provider layer (no LLM calls yet)."
+requires-python = ">=3.12"
+dependencies = [
+    "insurance-ai-retrieval",
+    "insurance-ai-shared",
+    "pydantic>=2.10",
+]
+
+[build-system]
+requires = ["setuptools>=75", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.uv.sources]
+insurance-ai-retrieval = { workspace = true }
+insurance-ai-shared = { workspace = true }

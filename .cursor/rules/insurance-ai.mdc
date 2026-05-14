@@ -89,6 +89,7 @@ Use this layout; do not introduce parallel top-level `routers/`, `services/`, `a
 - **apps/api/** — FastAPI app, routers, configuration, dependency injection, lifespan
 - **apps/web/** — Next.js UI, citations, workflow visualization
 - **packages/retrieval/** — Chunking, embedding, vector and BM25 search, hybrid retrieval, reranking
+- **packages/generation/** — Grounded prompts, answer schema, future LLM provider adapters (no agent runtime here)
 - **packages/ingestion/** — PDF parsing, loading, normalization, metadata extraction
 - **packages/evaluation/** — Retrieval, citation, and hallucination evaluation; benchmarks
 - **packages/shared/** — Shared Pydantic models, types, constants, utilities

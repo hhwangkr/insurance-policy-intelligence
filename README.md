@@ -62,7 +62,8 @@ apps/
 
 packages/
   ingestion/      # PDF ingestion
-  retrieval/      # Search/retrieval
+  retrieval/      # Search/retrieval, citation context
+  generation/     # Grounded prompt / answer schema / future LLM providers (no LLM calls yet)
   evaluation/     # Evaluation pipelines (reserved)
   shared/         # Shared models/types
 
@@ -241,7 +242,7 @@ uv run python -m insurance_ai_retrieval.build_citation_context \
 
 By default the JSON is printed to **stdout** only. **`--output-path`** is optional and is for **debugging**, **reproducible examples**, or **manual inspection**—saved citation-context JSON files are **not** part of the tracked dataset or the normal ingestion/index outputs. See [`docs/retrieval_baseline.md`](docs/retrieval_baseline.md).
 
-The usual path to a grounded prompt is **in memory**: `build_citation_context` → `CitationContextBundle` → `insurance_ai_retrieval.answer_prompt.build_grounded_answer_prompt` → (future LLM). The `build_answer_prompt` CLI, which reads a **saved** bundle JSON, is for **development/debugging** only—not the normal service flow.
+The usual path to a grounded prompt is **in memory**: `build_citation_context` → `CitationContextBundle` → `insurance_ai_generation.answer_prompt.build_grounded_answer_prompt` → (future LLM). The `build_answer_prompt` CLI (`python -m insurance_ai_generation.build_answer_prompt`), which reads a **saved** bundle JSON, is for **development/debugging** only—not the normal service flow.
 
 **K. Run retrieval evaluation (after index exists)**
 

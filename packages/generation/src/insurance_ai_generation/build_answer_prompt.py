@@ -5,7 +5,7 @@ import json
 import sys
 from pathlib import Path
 
-from insurance_ai_retrieval.answer_prompt import (
+from insurance_ai_generation.answer_prompt import (
     build_grounded_answer_prompt,
     format_grounded_answer_prompt_json,
 )

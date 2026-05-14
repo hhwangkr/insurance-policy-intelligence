@@ -247,7 +247,7 @@ This is the intended integration shape (all **in memory**; no required intermedi
 
 1. User query + metadata filters (`SearchFilters`).
 2. `search_local_index` (or `build_citation_context`, which calls it with an embedder) → **`CitationContextBundle`** in RAM.
-3. `build_grounded_answer_prompt(bundle)` from `insurance_ai_retrieval.answer_prompt` → **`GroundedAnswerPrompt`** (system + user messages).
+3. `build_grounded_answer_prompt(bundle)` from `insurance_ai_generation.answer_prompt` → **`GroundedAnswerPrompt`** (system + user messages).
 4. **Future step:** send `GroundedAnswerPrompt.messages` to your LLM provider (not implemented in this repo phase).
 
 Application code should call these Python functions directly; do not rely on shell round-trips through the filesystem for normal requests.
@@ -258,13 +258,20 @@ For **reproducible inspection** or **manual QA**, you may optionally save a bund
 
 ### Grounded answer prompt (`build_answer_prompt`, debug only)
 
-`insurance_ai_retrieval.build_answer_prompt` reads a saved **`CitationContextBundle`** JSON (for example from `build_citation_context --output-path`), builds **deterministic** system/user chat messages for a future grounded answer step, and prints JSON to stdout. **No LLM** and no API clients—prompt construction only.
+`insurance_ai_generation.build_answer_prompt` reads a saved **`CitationContextBundle`** JSON (for example from `build_citation_context --output-path`), builds **deterministic** system/user chat messages for a future grounded answer step, and prints JSON to stdout. **No LLM** and no API clients—prompt construction only.
 
 **Do not** treat “save context JSON → `build_answer_prompt`” as the production architecture; it mirrors the same `CitationContextBundle` → `build_grounded_answer_prompt` logic you would call in process memory in step 3 above.
 
+Example (debug, using a saved bundle under `data/processed/reports/`):
+
+```bash
+uv run python -m insurance_ai_generation.build_answer_prompt \
+  --context-path data/processed/reports/citation_context_example.json
+```
+
 ### Grounded answer schema and citation validation (Phase 2H-1, no LLM)
 
-`insurance_ai_retrieval.grounded_answer` defines a small **`GroundedAnswer`** model (prose + `citations_used` + `insufficient_context`) and **`validate_answer_citations`** / **`extract_citation_ids_from_text`** to detect invented `[C…]` markers, mismatches between body and `citations_used`, and empty or uncited answers when the model claims sufficient context. Use this **before or after** a future LLM call to guard rails—still **no LLM** and no provider SDKs in that module.
+`insurance_ai_generation.grounded_answer` defines a small **`GroundedAnswer`** model (prose + `citations_used` + `insufficient_context`) and **`validate_answer_citations`** / **`extract_citation_ids_from_text`** to detect invented `[C…]` markers, mismatches between body and `citations_used`, and empty or uncited answers when the model claims sufficient context. Use this **before or after** a future LLM call to guard rails—still **no LLM** and no provider SDKs in that module.
 
 ## Known limitations
 

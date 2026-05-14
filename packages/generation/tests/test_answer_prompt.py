@@ -1,6 +1,8 @@
 from __future__ import annotations
 
-from insurance_ai_retrieval.answer_prompt import (
+from pathlib import Path
+
+from insurance_ai_generation.answer_prompt import (
     build_grounded_answer_prompt,
     format_grounded_answer_prompt_json,
 )
@@ -111,10 +113,8 @@ def test_prompt_deterministic_json() -> None:
 
 
 def test_answer_prompt_module_has_no_llm_client_import() -> None:
-    from pathlib import Path
-
     path = (
-        Path(__file__).resolve().parents[1] / "src" / "insurance_ai_retrieval" / "answer_prompt.py"
+        Path(__file__).resolve().parents[1] / "src" / "insurance_ai_generation" / "answer_prompt.py"
     )
     src = path.read_text(encoding="utf-8")
     banned = ("openai", "anthropic", "cohere", "litellm", "google.generativeai")
