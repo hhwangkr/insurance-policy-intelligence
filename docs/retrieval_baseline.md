@@ -2,6 +2,8 @@
 
 This document describes the **minimal local semantic retrieval** layer over section-aware chunks. It is **retrieval only**: there is no answer generation, no LLM orchestration, and no cross-reference graph.
 
+For **PDF → JSON → sections → chunks → index → search** from a fresh clone, see the **Run end-to-end locally** section in [`README.md`](../README.md).
+
 ## What this is not
 
 - Not full RAG (no grounded answer synthesis).
@@ -60,21 +62,58 @@ Outputs (all under `data/processed/index/`, gitignored except `.gitkeep`):
 ```bash
 uv run python -m insurance_ai_retrieval.search_index \
   --index-dir data/processed/index \
-  --query "보험금 지급이 늦어지면 이자는 어떻게 계산돼?" \
+  --query "교보생명 개인연금저축 교보로연금보험 적립형에서 보험금 지급이 늦어지면 이자는 어떻게 계산돼?" \
   --top-k 5
 ```
 
 The CLI prints rank, similarity score, identifiers, section title/type, product metadata, page span, character span, and a short text preview. **Inspect** titles and metadata only; there is no “correct answer” assertion in this baseline.
 
-### Smoke-style queries (manual)
+### Multi-insurer corpus: scope your queries
 
-Use the same command with different `--query` strings, for example:
+The default manual corpus can include **multiple insurers and products** at once (for example Kyobo Life annuity, Samsung Life cancer / whole life, Mirae Asset Life variable annuity). **Generic** questions (“청약 철회는 언제까지 가능해?”, “해약환급금은 어떻게 지급돼?”) often match **valid** clauses in **more than one** policy, so top‑`k` hits may jump between documents. That is fine for **exploratory** search, but it makes **repeatable smoke tests** hard to judge.
+
+**Prefer insurer/product-scoped queries** when you want a stable bar for retrieval quality: repeat the same query after pipeline or model changes and check whether the intended document still dominates the hit list.
+
+- **Generic queries** are allowed for exploratory search across the whole index.
+- **Scoped queries** (insurer + product name or unmistakable product phrasing from the PDF/manifest) are better for **repeatable evaluation** and smoke checks.
+- **Expected results** should be judged using **`section_title`**, **`section_type`**, **insurer/product metadata** on the hit (`policy_unit_name`, `variant_name`, manifest-aligned labels when present), and **page range** (`page_start`–`page_end`), not by asking the CLI for a prose “answer.”
+
+### Smoke-style queries (insurer / product scoped)
+
+Use the same `search_index` command with different `--query` strings. Examples below align with the products in `data/manifests/manual.yaml`; adjust wording if your local manifest differs.
+
+**Kyobo Life — 개인연금저축 교보로연금보험 적립형**
+
+- `교보생명 개인연금저축 교보로연금보험 적립형에서 보험금 지급이 늦어지면 이자는 어떻게 계산돼?`
+- `교보생명 개인연금저축 교보로연금보험 적립형에서 청약 철회는 언제까지 가능해?`
+- `교보생명 개인연금저축 교보로연금보험 적립형에서 계약 전 알릴 의무를 위반하면 어떻게 돼?`
+- `교보생명 개인연금저축 교보로연금보험 적립형에서 연금 지급 기준표는 어디에 있어?`
+
+**Samsung Life — 인터넷암보험**
+
+- `삼성생명 인터넷암보험에서 보험금 청구 절차는 어떻게 돼?`
+- `삼성생명 인터넷암보험에서 암 진단 보험금 지급 사유는 뭐야?`
+- `삼성생명 인터넷암보험에서 보험금을 지급하지 않는 사유는 뭐야?`
+
+**Samsung Life — 밸런스종신보험**
+
+- `삼성생명 밸런스종신보험에서 해약환급금은 어떻게 지급돼?`
+- `삼성생명 밸런스종신보험에서 보험계약대출은 어떻게 돼?`
+- `삼성생명 밸런스종신보험에서 계약의 소멸은 어떤 경우야?`
+
+**Mirae Asset Life — 변액연금보험**
+
+- `미래에셋생명 변액연금보험에서 특별계정 운용은 어떻게 설명돼?`
+- `미래에셋생명 변액연금보험에서 연금 지급 기준은 어디에 있어?`
+- `미래에셋생명 변액연금보험에서 해약환급금은 어떻게 계산돼?`
+
+### Exploratory (generic) examples
+
+These can return hits from **any** policy in the index; use when browsing, not when you need a fixed expectation:
 
 - `보험금 지급이 늦어지면 이자는 어떻게 계산돼?`
 - `청약 철회는 언제까지 가능해?`
 - `해약환급금은 어떻게 지급돼?`
-- `계약 전 알릴 의무를 위반하면 어떻게 돼?`
-- `연금 지급 기준표는 어디에 있어?`
 
 ## E5-style prefixes
 
