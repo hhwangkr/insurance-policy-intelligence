@@ -220,7 +220,7 @@ Older `chunk_metadata.jsonl` rows without the new fields are **enriched at searc
 
 The CLI `insurance_ai_retrieval.build_citation_context` runs **metadata-scoped dense retrieval** (same filter semantics as `search_index`) and prints a **JSON bundle**: user query, filter snapshot, `top_k`, `dedupe_section`, and a `citations` array with stable handles `C1`, `C2`, … plus chunk metadata and **full** `text` for each hit.
 
-**Lifecycle:** a citation context is a **query-time** object. In production or a normal interactive flow you build it **in memory** (Python: `build_citation_context` from `insurance_ai_retrieval.citation_context`) and pass it to prompt / answer generation. It is **not** a pre-generated static artifact like chunks or the index.
+**Lifecycle:** a citation context is a **query-time** object. In production or a normal interactive flow you build it **in memory** (Python: `build_citation_context` from `insurance_ai_retrieval.citation_context`, which wraps `search_local_index`) and pass the resulting `CitationContextBundle` to the next layer. The bundle is **JSON-serializable** for debugging or fixtures, but it is **not** normally written to disk; persistence is not part of the standard pipeline like chunks or the index.
 
 **Default:** JSON goes to **stdout** only.
 
@@ -241,11 +241,26 @@ uv run python -m insurance_ai_retrieval.build_citation_context \
 
 Filter flags match **`search_index`** (`--document-id`, `--product-name`, `--policy-unit-name`, section-type overrides, etc.). There is **no LLM** call in this CLI.
 
+### Normal query-time path (application / service code)
+
+This is the intended integration shape (all **in memory**; no required intermediate JSON file):
+
+1. User query + metadata filters (`SearchFilters`).
+2. `search_local_index` (or `build_citation_context`, which calls it with an embedder) → **`CitationContextBundle`** in RAM.
+3. `build_grounded_answer_prompt(bundle)` from `insurance_ai_retrieval.answer_prompt` → **`GroundedAnswerPrompt`** (system + user messages).
+4. **Future step:** send `GroundedAnswerPrompt.messages` to your LLM provider (not implemented in this repo phase).
+
+Application code should call these Python functions directly; do not rely on shell round-trips through the filesystem for normal requests.
+
+### Debug / development path (saved JSON)
+
+For **reproducible inspection** or **manual QA**, you may optionally save a bundle with `build_citation_context --output-path …`, then run the CLI below to print a prompt JSON. That file path is **not** the normal data plane—only a convenience for humans and tests.
+
 ### Grounded answer prompt (`build_answer_prompt`, debug only)
 
 `insurance_ai_retrieval.build_answer_prompt` reads a saved **`CitationContextBundle`** JSON (for example from `build_citation_context --output-path`), builds **deterministic** system/user chat messages for a future grounded answer step, and prints JSON to stdout. **No LLM** and no API clients—prompt construction only.
 
-## Known limitations
+**Do not** treat “save context JSON → `build_answer_prompt`” as the production architecture; it mirrors the same `CitationContextBundle` → `build_grounded_answer_prompt` logic you would call in process memory in step 3 above.
 
 - **Embedding quality** depends on the chosen model and chunk text (Korean layout quirks, OCR noise).
 - **No reranking** beyond raw cosine similarity.

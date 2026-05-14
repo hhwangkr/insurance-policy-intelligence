@@ -16,8 +16,9 @@ from insurance_ai_shared.stdio_utf8 import configure_stdout_utf8
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(
         description=(
-            "Build LLM-ready grounded-answer messages from a citation context JSON file "
-            "(debug / development only; no LLM call)."
+            "Build LLM-ready grounded-answer messages from a saved CitationContextBundle JSON "
+            "(debug / development only; no LLM call). Normal services call "
+            "build_grounded_answer_prompt(bundle) in memory instead of this CLI."
         ),
     )
     parser.add_argument(
