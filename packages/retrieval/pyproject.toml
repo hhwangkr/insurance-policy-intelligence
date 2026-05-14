@@ -6,6 +6,7 @@ requires-python = ">=3.12"
 dependencies = [
     "insurance-ai-shared",
     "numpy>=2.1",
+    "pyyaml>=6",
     "sentence-transformers>=3.1",
 ]
 

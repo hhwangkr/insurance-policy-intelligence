@@ -116,6 +116,13 @@ def _metadata_matches(row: ChunkMetadataRecord, filters: SearchFilters) -> bool:
     return True
 
 
+def filters_match_hit(meta: ChunkMetadataRecord, filters: SearchFilters) -> bool:
+    """True if ``meta`` passes the same gates ``search_local_index`` uses pre-ranking."""
+    if not _section_type_allowed(meta.section_type, filters):
+        return False
+    return _metadata_matches(meta, filters)
+
+
 def _write_jsonl(path: Path, records: list[ChunkMetadataRecord]) -> None:
     with path.open("w", encoding="utf-8") as fh:
         for rec in records:

@@ -1,0 +1,55 @@
+# Curated deterministic retrieval evaluation queries (Phase 2F harness).
+# Run: uv run python -m insurance_ai_retrieval.evaluate_retrieval \
+#   --index-dir data/processed/index \
+#   --queries data/eval/retrieval_queries.yaml \
+#   --report-path data/processed/reports/retrieval_eval.md
+
+queries:
+  - id: kyobo_annuity_delayed_payment_interest
+    query: "보험금 지급이 늦어지면 이자는 어떻게 계산돼?"
+    filters:
+      insurer: kyobolife
+      product_type: annuity
+      variant_name: 적립형
+    expected_any_section_titles:
+      - "( 별표 3 )"
+      - "제7조 (보험금등의지급절차)"
+    top_k: 5
+
+  - id: kyobo_annuity_cancellation
+    query: "청약 철회는 언제까지 가능해?"
+    filters:
+      insurer: kyobolife
+      product_type: annuity
+      variant_name: 적립형
+    expected_any_section_titles:
+      - "제15조 (청약의철회)"
+    top_k: 5
+
+  - id: samsung_cancer_diagnosis_payment
+    query: "암 진단 보험금 지급 사유는 뭐야?"
+    filters:
+      insurer: samsunglife
+      product_type: cancer
+    expected_any_section_titles:
+      - "제3조 [보험금의 지급사유]"
+    top_k: 5
+
+  - id: samsung_whole_life_surrender
+    query: "해약환급금은 어떻게 지급돼?"
+    filters:
+      insurer: samsunglife
+      product_type: whole_life
+    expected_any_section_titles:
+      - "제32조 [해약환급금]"
+    top_k: 5
+
+  - id: mirae_variable_special_account
+    query: "특별계정 운용은 어떻게 설명돼?"
+    filters:
+      insurer: miraeassetlife
+      product_type: variable_annuity
+    expected_any_section_titles:
+      - "제108조 (특별계정의 설정∙운용)"
+      - "제2조 (용어의 정의)"
+    top_k: 5
