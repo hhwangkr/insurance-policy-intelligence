@@ -225,7 +225,7 @@ uv run python -m insurance_ai_retrieval.search_index \
 
 More scoped smoke examples: [`docs/retrieval_baseline.md`](docs/retrieval_baseline.md).
 
-**K. Citation context bundle (query-time JSON)**
+**J. Build citation context bundle (query-time JSON)**
 
 `build_citation_context` runs the same retrieval as **I** but emits a **structured JSON bundle** (citations `C1`, `C2`, … with full chunk metadata and text) for a future grounded-answer step. The bundle is **built per request** in memory; in a normal query path you would call the library API and pass the result downstream without treating it as a pipeline artifact.
 
@@ -242,7 +242,7 @@ uv run python -m insurance_ai_retrieval.build_citation_context \
 
 By default the JSON is printed to **stdout** only. **`--output-path`** is optional and is for **debugging**, **reproducible examples**, or **manual inspection**—saved citation-context JSON files are **not** part of the tracked dataset or the normal ingestion/index outputs. See [`docs/retrieval_baseline.md`](docs/retrieval_baseline.md).
 
-**J. Run retrieval evaluation (after index exists)**
+**K. Run retrieval evaluation (after index exists)**
 
 ```bash
 uv run python -m insurance_ai_retrieval.evaluate_retrieval \
@@ -303,9 +303,9 @@ This repo keeps a **reproducible paper trail** for public disclosure PDFs:
 | Generated outputs | `data/processed/documents/*.json` | **Not tracked** (large, noisy); regenerate locally. |
 | Chunk JSON (generated) | `data/processed/chunks/*.chunks.json` | **Not tracked**; regenerate with **Run end-to-end locally** (step F). |
 | Local dense index | `data/processed/index/` | **Not tracked** except `.gitkeep`; regenerate with **Run end-to-end locally** (step H). |
-| Retrieval eval queries | `data/eval/retrieval_queries.yaml` | **Tracked** curated cases for `evaluate_retrieval` (step **J**). |
-| Retrieval eval report | `data/processed/reports/retrieval_eval.md` | **Not tracked**; written by step **J**. |
-| Optional citation-context JSON (debug) | `data/processed/reports/*citation_context*.json` | **Not tracked** if you use `--output-path` on **K**; query-time bundles are normally in-memory only. |
+| Retrieval eval queries | `data/eval/retrieval_queries.yaml` | **Tracked** curated cases for `evaluate_retrieval` (step **K**). |
+| Retrieval eval report | `data/processed/reports/retrieval_eval.md` | **Not tracked**; written by step **K**. |
+| Optional citation-context JSON (debug) | `data/processed/reports/*citation_context*.json` | **Not tracked** if you use `--output-path` on **J**; query-time bundles are normally in-memory only. |
 | Portfolio sample | `examples/processed_documents/` | **Tracked** small schema exemplar. |
 
 **Tradeoff:** storing both inbox originals and normalized copies **duplicates bytes** in git for the
@@ -316,7 +316,7 @@ download names.
 **Ingestion inputs:** the pipeline resolves PDF paths from the manifest only — `source_file` must
 point under **`data/raw/manual/`** (not the inbox). See `docs/data-staging.md`.
 
-Regenerate processed JSON, sections, chunks, index, run search, optionally emit a query-time citation bundle (**K**), and run retrieval evaluation using the ordered commands in **Run end-to-end locally** above. Omit `--report-path` on inspect commands for console-only output; markdown reports under `data/processed/reports/` are generated locally and gitignored.
+Regenerate processed JSON, sections, chunks, index, run search, optionally emit a query-time citation bundle (**J**), and run retrieval evaluation (**K**) using the ordered commands in **Run end-to-end locally** above. Omit `--report-path` on inspect commands for console-only output; markdown reports under `data/processed/reports/` are generated locally and gitignored.
 
 See also `docs/data-staging.md` and `examples/processed_documents/README.md`.
 
