@@ -50,6 +50,17 @@ _SYSTEM_INSTRUCTIONS = "\n".join(
         "- Reply in the SAME language as the user's question unless they explicitly ask for "
         "another language.",
         "",
+        "Output format (mandatory):",
+        "- Return ONLY valid JSON. Do not wrap it in markdown fences; do not add any text before "
+        "or after the JSON object.",
+        '- Use exactly these keys: "answer", "citations_used", "insufficient_context".',
+        '- The "answer" string MUST include at least one bracket citation like [C1] that matches '
+        "a passage you used, unless you set insufficient_context to true.",
+        '- "citations_used" MUST list every citation ID (e.g. C1, C2) that appears as [C1], '
+        "[C2] in answer, in any order, with no extras.",
+        '- If the excerpts are insufficient to answer, set "insufficient_context": true and '
+        "give a brief explanation in answer; citations_used may be empty.",
+        "",
         "The next user message contains [Question], retrieval filter context, and [Citations]. "
         "Stay within those passages only.",
     ],

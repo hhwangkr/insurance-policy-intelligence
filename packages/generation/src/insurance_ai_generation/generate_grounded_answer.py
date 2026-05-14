@@ -9,6 +9,7 @@ from insurance_ai_generation.grounded_answer import (
     GroundedAnswer,
     GroundedAnswerValidation,
     extract_citation_ids_from_text,
+    grounded_answer_json_schema,
     validate_answer_citations,
 )
 from insurance_ai_generation.llm_provider import LLMProvider, LLMRequest
@@ -64,6 +65,7 @@ def generate_grounded_answer(
         model=model,
         temperature=temperature,
         max_tokens=max_tokens,
+        response_schema=grounded_answer_json_schema(),
     )
     response = provider.complete(request)
     answer = parse_provider_text_to_grounded_answer(response.text)

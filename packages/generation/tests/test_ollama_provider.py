@@ -75,6 +75,74 @@ def test_ollama_complete_sends_expected_payload() -> None:
         {"role": "user", "content": "user"},
     ]
     assert captured["url"] == "http://localhost:11434/api/chat"
+    assert "format" not in pl
+
+
+def test_ollama_includes_format_when_response_schema_set() -> None:
+    from insurance_ai_generation.grounded_answer import grounded_answer_json_schema
+
+    captured: dict[str, object] = {}
+
+    def fake_post(_u: str, body: bytes, _t: float) -> tuple[int, bytes]:
+        captured["payload"] = json.loads(body.decode("utf-8"))
+        return (
+            200,
+            json.dumps(
+                {
+                    "model": "m",
+                    "message": {
+                        "role": "assistant",
+                        "content": (
+                            '{"answer":"x [C1]","citations_used":["C1"],'
+                            '"insufficient_context":false}'
+                        ),
+                    },
+                    "done": True,
+                },
+            ).encode(),
+        )
+
+    schema = grounded_answer_json_schema()
+    p = OllamaProvider("m", http_post=fake_post)
+    p.complete(
+        LLMRequest(
+            messages=[ChatMessage(role="user", content="hi")],
+            model="m",
+            response_schema=schema,
+        ),
+    )
+    pl = captured["payload"]
+    assert isinstance(pl, dict)
+    assert pl.get("format") == schema
+
+
+def test_ollama_includes_format_json_string_when_response_format_json() -> None:
+    captured: dict[str, object] = {}
+
+    def fake_post(_u: str, body: bytes, _t: float) -> tuple[int, bytes]:
+        captured["payload"] = json.loads(body.decode("utf-8"))
+        return (
+            200,
+            json.dumps(
+                {
+                    "model": "m",
+                    "message": {"role": "assistant", "content": "{}"},
+                    "done": True,
+                },
+            ).encode(),
+        )
+
+    p = OllamaProvider("m", http_post=fake_post)
+    p.complete(
+        LLMRequest(
+            messages=[ChatMessage(role="user", content="hi")],
+            model="m",
+            response_format="json",
+        ),
+    )
+    pl = captured["payload"]
+    assert isinstance(pl, dict)
+    assert pl["format"] == "json"
 
 
 def test_ollama_complete_missing_model_raises() -> None:

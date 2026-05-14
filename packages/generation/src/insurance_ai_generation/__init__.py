@@ -15,6 +15,7 @@ from insurance_ai_generation.grounded_answer import (
     GroundedAnswer,
     GroundedAnswerValidation,
     extract_citation_ids_from_text,
+    grounded_answer_json_schema,
     validate_answer_citations,
 )
 from insurance_ai_generation.llm_provider import (
@@ -54,6 +55,7 @@ __all__ = [
     "extract_citation_ids_from_text",
     "format_grounded_answer_prompt_json",
     "generate_grounded_answer",
+    "grounded_answer_json_schema",
     "parse_provider_text_to_grounded_answer",
     "validate_answer_citations",
 ]

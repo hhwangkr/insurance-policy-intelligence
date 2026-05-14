@@ -43,9 +43,27 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--model", type=str, default=None)
     parser.add_argument("--temperature", type=float, default=0.0)
     parser.add_argument("--max-tokens", type=int, default=None)
+    fail_group = parser.add_mutually_exclusive_group()
+    fail_group.add_argument(
+        "--fail-on-invalid",
+        dest="fail_on_invalid",
+        action="store_true",
+        help="Exit with status 1 when citation validation fails (default for ollama).",
+    )
+    fail_group.add_argument(
+        "--no-fail-on-invalid",
+        dest="fail_on_invalid",
+        action="store_false",
+        help="Exit 0 even when validation fails (default for static).",
+    )
+    parser.set_defaults(fail_on_invalid=None)
     args = parser.parse_args(argv)
 
     configure_stdout_utf8()
+
+    fail_on_invalid = args.fail_on_invalid
+    if fail_on_invalid is None:
+        fail_on_invalid = args.provider.strip().lower() == "ollama"
 
     try:
         raw = json.loads(args.context_path.read_text(encoding="utf-8"))
@@ -91,6 +109,8 @@ def main(argv: list[str] | None = None) -> int:
         return 1
 
     sys.stdout.write(out)
+    if fail_on_invalid and not result.validation.is_valid:
+        return 1
     return 0
 
 

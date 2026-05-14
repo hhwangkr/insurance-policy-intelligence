@@ -1,10 +1,24 @@
 from __future__ import annotations
 
 import re
+from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field
 
 _CITATION_BRACKET_RE: re.Pattern[str] = re.compile(r"\[C(\d+)\]")
+
+
+def grounded_answer_json_schema() -> dict[str, Any]:
+    """JSON Schema for ``GroundedAnswer``-shaped model output (Ollama ``format`` field)."""
+    return {
+        "type": "object",
+        "required": ["answer", "citations_used", "insufficient_context"],
+        "properties": {
+            "answer": {"type": "string"},
+            "citations_used": {"type": "array", "items": {"type": "string"}},
+            "insufficient_context": {"type": "boolean"},
+        },
+    }
 
 
 class GroundedAnswer(BaseModel):

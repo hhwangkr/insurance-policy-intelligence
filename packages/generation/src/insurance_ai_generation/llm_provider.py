@@ -1,8 +1,8 @@
 from __future__ import annotations
 
-from typing import Protocol, runtime_checkable
+from typing import Any, Protocol, runtime_checkable
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field
 
 from insurance_ai_generation.answer_prompt import ChatMessage
 
@@ -16,6 +16,14 @@ class LLMRequest(BaseModel):
     model: str | None = None
     temperature: float = 0.0
     max_tokens: int | None = None
+    response_format: str | None = Field(
+        default=None,
+        description="Optional hint, e.g. ``json`` when no ``response_schema`` is set.",
+    )
+    response_schema: dict[str, Any] | None = Field(
+        default=None,
+        description="JSON Schema for structured output; providers map this to their API.",
+    )
 
 
 class LLMResponse(BaseModel):

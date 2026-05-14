@@ -122,7 +122,7 @@ infra/
 - Section-aware chunking
 - Local dense semantic retrieval over chunks, with **metadata-scoped search** (insurer, product type, optional variant)
 - **Retrieval evaluation harness** driven by a **curated YAML query set** at [`data/eval/retrieval_queries.yaml`](data/eval/retrieval_queries.yaml) (see [`docs/retrieval_baseline.md`](docs/retrieval_baseline.md) for methodology and extra smoke examples)
-- **Generation layer:** grounded prompt + **`GroundedAnswer`** validation, **`LLMProvider`** + **`generate_grounded_answer`**, **`provider_registry`** (`static` offline + optional **local Ollama** via stdlib HTTP; no paid APIs or API keys), and debug CLIs **`build_answer_prompt`** / **`generate_answer`** (saved citation JSON for debug only)
+- **Generation layer:** grounded prompt (strict JSON + `[C1]` citation rules), **`GroundedAnswer`** validation, **`LLMProvider`** + schema-aware **`LLMRequest`**, **`generate_grounded_answer`** (passes **`grounded_answer_json_schema()`** to providers that support it), **`provider_registry`** (`static` + **local Ollama** / `format` JSON schema), debug CLIs **`build_answer_prompt`** / **`generate_answer`** (`--fail-on-invalid` defaults on for Ollama; no paid APIs)
 
 **Not yet**
 

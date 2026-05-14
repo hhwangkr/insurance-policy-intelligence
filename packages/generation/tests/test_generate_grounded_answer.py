@@ -8,6 +8,7 @@ from insurance_ai_generation.generate_grounded_answer import (
     generate_grounded_answer,
     parse_provider_text_to_grounded_answer,
 )
+from insurance_ai_generation.grounded_answer import grounded_answer_json_schema
 from insurance_ai_generation.llm_provider import LLMRequest, LLMResponse, StaticLLMProvider
 
 
@@ -95,6 +96,14 @@ def test_generate_insufficient_context_json_without_citations() -> None:
     result = generate_grounded_answer(prompt, provider)
     assert result.answer.insufficient_context is True
     assert result.validation.is_valid
+
+
+def test_generate_grounded_answer_passes_grounded_answer_json_schema() -> None:
+    provider = StaticLLMProvider("{}")
+    prompt = _prompt(citation_ids=["C1"])
+    generate_grounded_answer(prompt, provider)
+    assert provider.last_request is not None
+    assert provider.last_request.response_schema == grounded_answer_json_schema()
 
 
 def test_provider_receives_prompt_messages() -> None:

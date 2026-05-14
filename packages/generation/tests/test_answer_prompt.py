@@ -44,7 +44,11 @@ def _bundle(**kwargs: object) -> CitationContextBundle:
     return CitationContextBundle.model_validate(defaults)
 
 
-def test_prompt_includes_citation_ids_section_titles_pages() -> None:
+def test_build_grounded_answer_prompt_system_requires_json_only() -> None:
+    p = build_grounded_answer_prompt(_bundle())
+    system = p.messages[0].content
+    assert "Return ONLY valid JSON" in system
+    assert "insufficient_context" in system
     b = _bundle(
         citations=[
             _entry(citation_id="C1", section_title="제A조", page_start=1, page_end=1),

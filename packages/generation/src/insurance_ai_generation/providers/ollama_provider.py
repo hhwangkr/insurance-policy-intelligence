@@ -63,7 +63,7 @@ class OllamaProvider:
         model: str,
         *,
         base_url: str | None = None,
-        timeout_seconds: float = 120.0,
+        timeout_seconds: float = 600.0,
         http_post: HttpPostFn | None = None,
     ) -> None:
         self._model = model.strip()
@@ -87,6 +87,11 @@ class OllamaProvider:
         }
         if request.max_tokens is not None:
             payload["options"]["num_predict"] = int(request.max_tokens)
+
+        if request.response_schema is not None:
+            payload["format"] = request.response_schema
+        elif request.response_format == "json":
+            payload["format"] = "json"
 
         url = f"{self._base_url}/api/chat"
         body = json.dumps(payload, ensure_ascii=False).encode("utf-8")

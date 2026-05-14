@@ -5,6 +5,7 @@ from pathlib import Path
 from insurance_ai_generation.grounded_answer import (
     GroundedAnswer,
     extract_citation_ids_from_text,
+    grounded_answer_json_schema,
     validate_answer_citations,
 )
 
@@ -104,6 +105,13 @@ def test_validation_sorted_lists_deterministic() -> None:
     assert v1.model_dump() == v2.model_dump()
     assert v1.citation_ids_in_text == ["C1", "C2"]
     assert v1.allowed_citation_ids == ["C1", "C2", "C3"]
+
+
+def test_grounded_answer_json_schema_shape() -> None:
+    s = grounded_answer_json_schema()
+    assert s["type"] == "object"
+    assert set(s["required"]) == {"answer", "citations_used", "insufficient_context"}
+    assert set(s["properties"]) == {"answer", "citations_used", "insufficient_context"}
 
 
 def test_grounded_answer_module_no_llm_strings() -> None:

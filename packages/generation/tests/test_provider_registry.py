@@ -188,6 +188,87 @@ def test_generate_answer_cli_static_response_override() -> None:
     assert data["validation"]["is_valid"] is True
 
 
+def test_generate_answer_cli_invalid_static_default_exits_zero() -> None:
+    repo = _repo_root()
+    ctx = repo / "data/processed/reports/citation_context_example.json"
+    if not ctx.is_file():
+        pytest.skip("citation_context_example.json not in workspace")
+    bad = {
+        "answer": "no citation markers here",
+        "citations_used": [],
+        "insufficient_context": False,
+    }
+    cmd = [
+        sys.executable,
+        "-m",
+        "insurance_ai_generation.generate_answer",
+        "--context-path",
+        str(ctx),
+        "--provider",
+        "static",
+        "--static-response",
+        json.dumps(bad, ensure_ascii=False),
+    ]
+    proc = subprocess.run(cmd, cwd=repo, capture_output=True, text=True, check=False, timeout=60)  # noqa: S603
+    assert proc.returncode == 0, proc.stderr
+    data = json.loads(proc.stdout)
+    assert data["validation"]["is_valid"] is False
+
+
+def test_generate_answer_cli_fail_on_invalid_static_exits_nonzero() -> None:
+    repo = _repo_root()
+    ctx = repo / "data/processed/reports/citation_context_example.json"
+    if not ctx.is_file():
+        pytest.skip("citation_context_example.json not in workspace")
+    bad = {
+        "answer": "no citation markers here",
+        "citations_used": [],
+        "insufficient_context": False,
+    }
+    cmd = [
+        sys.executable,
+        "-m",
+        "insurance_ai_generation.generate_answer",
+        "--context-path",
+        str(ctx),
+        "--provider",
+        "static",
+        "--static-response",
+        json.dumps(bad, ensure_ascii=False),
+        "--fail-on-invalid",
+    ]
+    proc = subprocess.run(cmd, cwd=repo, capture_output=True, text=True, check=False, timeout=60)  # noqa: S603
+    assert proc.returncode == 1
+    data = json.loads(proc.stdout)
+    assert data["validation"]["is_valid"] is False
+
+
+def test_generate_answer_cli_no_fail_on_invalid_exits_zero() -> None:
+    repo = _repo_root()
+    ctx = repo / "data/processed/reports/citation_context_example.json"
+    if not ctx.is_file():
+        pytest.skip("citation_context_example.json not in workspace")
+    bad = {
+        "answer": "no citation markers here",
+        "citations_used": [],
+        "insufficient_context": False,
+    }
+    cmd = [
+        sys.executable,
+        "-m",
+        "insurance_ai_generation.generate_answer",
+        "--context-path",
+        str(ctx),
+        "--provider",
+        "static",
+        "--static-response",
+        json.dumps(bad, ensure_ascii=False),
+        "--no-fail-on-invalid",
+    ]
+    proc = subprocess.run(cmd, cwd=repo, capture_output=True, text=True, check=False, timeout=60)  # noqa: S603
+    assert proc.returncode == 0, proc.stderr
+
+
 def test_registry_modules_have_no_sdk_import_strings() -> None:
     root = Path(__file__).resolve().parents[1] / "src" / "insurance_ai_generation"
     for fname in ("provider_registry.py", "generate_answer.py", "providers/ollama_provider.py"):
