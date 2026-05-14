@@ -241,6 +241,10 @@ uv run python -m insurance_ai_retrieval.build_citation_context \
 
 Filter flags match **`search_index`** (`--document-id`, `--product-name`, `--policy-unit-name`, section-type overrides, etc.). There is **no LLM** call in this CLI.
 
+### Grounded answer prompt (`build_answer_prompt`, debug only)
+
+`insurance_ai_retrieval.build_answer_prompt` reads a saved **`CitationContextBundle`** JSON (for example from `build_citation_context --output-path`), builds **deterministic** system/user chat messages for a future grounded answer step, and prints JSON to stdout. **No LLM** and no API clients—prompt construction only.
+
 ## Known limitations
 
 - **Embedding quality** depends on the chosen model and chunk text (Korean layout quirks, OCR noise).
