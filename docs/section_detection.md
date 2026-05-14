@@ -33,3 +33,7 @@ This note describes the **deterministic** Korean policy PDF section pipeline in 
 ## Cross-reference mapping
 
 **Out of scope** for this layer. Section detection only produces citation-ready slices and metadata; resolving “제7조” mentions inside prose to canonical section IDs is a separate concern (graph / linker), not implemented here.
+
+## Section-aware chunking (Phase 2E)
+
+Deterministic chunking reads ``data/processed/sections/*.sections.json`` and writes ``data/processed/chunks/*.chunks.json`` via ``uv run python -m insurance_ai_ingestion.chunk_sections``. Each chunk is confined to a single ``DocumentSection`` (no cross-section merges). ``DocumentChunk.page_start`` / ``page_end`` inherit the section’s page span until per-chunk page mapping exists.

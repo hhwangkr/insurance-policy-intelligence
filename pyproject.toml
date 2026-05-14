@@ -9,6 +9,7 @@ requires-python = ">=3.12"
 managed = true
 
 [tool.uv.sources]
+insurance-ai-api = { workspace = true }
 insurance-ai-ingestion = { workspace = true }
 insurance-ai-shared = { workspace = true }
 
@@ -24,7 +25,9 @@ members = [
 
 [dependency-groups]
 dev = [
+    "annotated-doc>=0.0.4",
     "httpx>=0.28",
+    "insurance-ai-api",
     "insurance-ai-ingestion",
     "insurance-ai-shared",
     "mypy>=1.13",

@@ -437,7 +437,9 @@ source = { virtual = "." }
 
 [package.dev-dependencies]
 dev = [
+    { name = "annotated-doc" },
     { name = "httpx" },
+    { name = "insurance-ai-api" },
     { name = "insurance-ai-ingestion" },
     { name = "insurance-ai-shared" },
     { name = "mypy" },
@@ -454,7 +456,9 @@ dev = [
 
 [package.metadata.requires-dev]
 dev = [
+    { name = "annotated-doc", specifier = ">=0.0.4" },
     { name = "httpx", specifier = ">=0.28" },
+    { name = "insurance-ai-api", editable = "apps/api" },
     { name = "insurance-ai-ingestion", editable = "packages/ingestion" },
     { name = "insurance-ai-shared", editable = "packages/shared" },
     { name = "mypy", specifier = ">=1.13" },
