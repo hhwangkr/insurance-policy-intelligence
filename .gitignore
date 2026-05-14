@@ -44,3 +44,7 @@ data/processed/sections/*.json
 
 # Generated ingestion quality reports (optional markdown output from inspect_documents)
 data/processed/reports/*.md
+
+# Generated chunk artifacts
+data/processed/chunks/*.chunks.json
+!data/processed/chunks/.gitkeep
