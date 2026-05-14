@@ -18,6 +18,9 @@ from insurance_ai_retrieval.index_engine import (
 from insurance_ai_retrieval.metadata import ChunkMetadataRecord, enrich_chunk_metadata
 from insurance_ai_shared.models.chunk import ChunkingConfig, DocumentChunk, DocumentChunksArtifact
 
+# Concrete document_id values from the demo corpus are fixtures for parsing/enrichment and
+# filter tests (pipeline invariants). Benchmark expected titles belong in data/eval/*.yaml.
+
 
 def _dt() -> datetime:
     return datetime(2026, 5, 14, tzinfo=UTC)

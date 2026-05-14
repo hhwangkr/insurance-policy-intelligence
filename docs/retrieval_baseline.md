@@ -195,6 +195,12 @@ These can return hits from **any** policy in the index; use when browsing, not w
 - `청약 철회는 언제까지 가능해?`
 - `해약환급금은 어떻게 지급돼?`
 
+## Curated retrieval evaluation (`data/eval/retrieval_queries.yaml`)
+
+The file [`data/eval/retrieval_queries.yaml`](../data/eval/retrieval_queries.yaml) is **intentionally curated** for the **staged demo corpus** (queries, metadata filters, and expected section titles). It is **not** a universal contract that every future policy PDF must satisfy.
+
+**Generic** retrieval and citation behavior—metadata filters, valid citation IDs, deterministic citation bundles, validation rules, and inspection output—is covered by **`pytest`** and library APIs. When you add a new disclosure PDF, use **inspect CLIs and reports** first; add new YAML eval rows **only** when that product should join the **tracked benchmark set**. See [`testing_strategy.md`](testing_strategy.md).
+
 ## E5-style prefixes
 
 For intfloat E5-family models, inputs are prefixed in code (not by hand):

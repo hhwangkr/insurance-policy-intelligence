@@ -81,7 +81,8 @@ scripts/          # operational helpers (see docs/data-staging.md)
                   #   stage_manual_inbox.py — rule-based inbox batch + manual.yaml
 
 docs/
-  data-staging.md   # Manual PDF staging and manifest conventions
+  data-staging.md      # Manual PDF staging and manifest conventions
+  testing_strategy.md  # pytest vs curated eval vs reports (see "Testing and evaluation strategy")
 infra/
 ```
 
@@ -121,7 +122,7 @@ infra/
 - Policy unit / variant assignment
 - Section-aware chunking
 - Local dense semantic retrieval over chunks, with **metadata-scoped search** (insurer, product type, optional variant)
-- **Retrieval evaluation harness** driven by a **curated YAML query set** at [`data/eval/retrieval_queries.yaml`](data/eval/retrieval_queries.yaml) (see [`docs/retrieval_baseline.md`](docs/retrieval_baseline.md) for methodology and extra smoke examples)
+- **Retrieval evaluation harness** driven by a **curated YAML query set** at [`data/eval/retrieval_queries.yaml`](data/eval/retrieval_queries.yaml) (benchmark for the demo corpus; see [`docs/testing_strategy.md`](docs/testing_strategy.md) and [`docs/retrieval_baseline.md`](docs/retrieval_baseline.md))
 - **Generation layer:** language-neutral grounded prompt; **structured** citation validation (default) on allowed **`citations_used`** (format / ID contract, not prose faithfulness); optional **`--require-inline-citations`** for strict **`[C1]`**-in-text mode; **`render_grounded_answer_with_citations`** and **`render_citation_summary`**; **`inspect_grounded_answer`** / **`inspect_answer`** for manual cited-vs-uncited inspection (markdown optional); **`GroundedAnswer`**, **`LLMProvider`**, **`generate_grounded_answer`**, **`provider_registry`**, debug CLIs **`build_answer_prompt`** / **`generate_answer`** (optional **`--output-path`**; **`--fail-on-invalid`** defaults on for Ollama; no paid APIs)
 
 **Not yet**
@@ -272,6 +273,17 @@ Cases live in [`data/eval/retrieval_queries.yaml`](data/eval/retrieval_queries.y
 
 ---
 
+## Testing and evaluation strategy
+
+- **`pytest`** (under `packages/*/tests/`) should mostly guard **reusable pipeline invariants** (schemas, filters, deterministic citation handles, validation rules, inspection shapes)—not every product-specific section title.
+- **`data/eval/*.yaml`** (e.g. [`data/eval/retrieval_queries.yaml`](data/eval/retrieval_queries.yaml)) holds **curated benchmark fixtures** for the **current demo corpus**. Extend them when a new document is meant to join that benchmark set.
+- **Adding a new PDF** normally means manifest → ingest → section/chunk/index steps → **run generic tests** → **inspect markdown reports**; it should **not** by default require editing Python tests.
+- **Quality and inspection reports** (`inspect_*` CLIs, `data/processed/reports/*.md`, optional grounded-answer inspection) are the first tools for new documents; **manual review** covers faithfulness until an automated judge exists.
+
+See [`docs/testing_strategy.md`](docs/testing_strategy.md) for the full checklist and principles.
+
+---
+
 ## Local Development
 
 Install dependencies:
@@ -292,6 +304,8 @@ Run tests:
 uv run pytest
 ```
 
+See [`docs/testing_strategy.md`](docs/testing_strategy.md) for how **pytest**, **curated eval YAML**, and **inspection reports** relate.
+
 ---
 
 ## Data artifacts
@@ -306,7 +320,8 @@ This repo keeps a **reproducible paper trail** for public disclosure PDFs:
 | Generated outputs | `data/processed/documents/*.json` | **Not tracked** (large, noisy); regenerate locally. |
 | Chunk JSON (generated) | `data/processed/chunks/*.chunks.json` | **Not tracked**; regenerate with **Run end-to-end locally** (step F). |
 | Local dense index | `data/processed/index/` | **Not tracked** except `.gitkeep`; regenerate with **Run end-to-end locally** (step H). |
-| Retrieval eval queries | `data/eval/retrieval_queries.yaml` | **Tracked** curated cases for `evaluate_retrieval` (step **K**). |
+| Retrieval eval queries | `data/eval/retrieval_queries.yaml` | **Tracked** curated benchmark cases for `evaluate_retrieval` (demo corpus; step **K**). |
+| Testing / eval strategy | `docs/testing_strategy.md` | **Tracked** how pytest, YAML benchmarks, and reports fit together. |
 | Retrieval eval report | `data/processed/reports/retrieval_eval.md` | **Not tracked**; written by step **K**. |
 | Optional citation-context JSON (debug) | `data/processed/reports/*citation_context*.json` | **Not tracked** if you use `--output-path` on **J**; query-time bundles are normally in-memory only. |
 | Portfolio sample | `examples/processed_documents/` | **Tracked** small schema exemplar. |

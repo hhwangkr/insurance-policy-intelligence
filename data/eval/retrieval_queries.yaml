@@ -1,4 +1,6 @@
 # Curated deterministic retrieval evaluation queries (Phase 2F harness).
+# Benchmark fixture: tied to the staged demo corpus in data/manifests — not a universal
+# contract for every future PDF. Add rows when a policy should join this benchmark set.
 # Run: uv run python -m insurance_ai_retrieval.evaluate_retrieval \
 #   --index-dir data/processed/index \
 #   --queries data/eval/retrieval_queries.yaml \

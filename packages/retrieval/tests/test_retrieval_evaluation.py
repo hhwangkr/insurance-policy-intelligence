@@ -22,6 +22,10 @@ from insurance_ai_retrieval.retrieval_evaluation import (
     write_report,
 )
 
+# Demo-corpus document_id strings are synthetic fixtures for stable metadata shapes (not a
+# requirement those products always remain in-repo). Curated section-title expectations live in
+# data/eval/retrieval_queries.yaml.
+
 _KYOBO_DOC = "kyobolife_annuity_kyobo_ro_annuity_insurance_policy_terms_20260101_080b9e62"
 
 
