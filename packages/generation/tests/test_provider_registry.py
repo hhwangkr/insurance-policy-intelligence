@@ -179,6 +179,46 @@ def test_generate_answer_cli_rendered_answer_structured_static() -> None:
     assert data["citation_summary"] == render_citation_summary(ga, bundle)
 
 
+def test_generate_answer_cli_output_path_writes_same_json_as_stdout(tmp_path: Path) -> None:
+    repo = _repo_root()
+    ctx = repo / "data/processed/reports/citation_context_example.json"
+    if not ctx.is_file():
+        pytest.skip("citation_context_example.json not in workspace")
+    outp = tmp_path / "generation_result_example.json"
+    payload = {
+        "answer": "out path test",
+        "citations_used": ["C1"],
+        "insufficient_context": False,
+    }
+    cmd = [
+        sys.executable,
+        "-m",
+        "insurance_ai_generation.generate_answer",
+        "--context-path",
+        str(ctx),
+        "--provider",
+        "static",
+        "--static-response",
+        json.dumps(payload, ensure_ascii=False),
+        "--output-path",
+        str(outp),
+    ]
+    proc = subprocess.run(  # noqa: S603
+        cmd,
+        cwd=repo,
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+        check=False,
+        timeout=60,
+    )
+    assert proc.returncode == 0, proc.stderr
+    from_stdout = json.loads(proc.stdout)
+    from_file = json.loads(outp.read_text(encoding="utf-8"))
+    assert from_stdout == from_file
+    assert from_file["answer"]["answer"] == "out path test"
+
+
 def test_generate_answer_cli_ollama_requires_model() -> None:
     repo = _repo_root()
     ctx = repo / "data/processed/reports/citation_context_example.json"
@@ -377,7 +417,13 @@ def test_generate_answer_cli_no_fail_on_invalid_exits_zero() -> None:
 
 def test_registry_modules_have_no_sdk_import_strings() -> None:
     root = Path(__file__).resolve().parents[1] / "src" / "insurance_ai_generation"
-    for fname in ("provider_registry.py", "generate_answer.py", "providers/ollama_provider.py"):
+    for fname in (
+        "provider_registry.py",
+        "generate_answer.py",
+        "inspect_answer.py",
+        "inspect_grounded_answer.py",
+        "providers/ollama_provider.py",
+    ):
         text = (root / fname).read_text(encoding="utf-8").lower()
         for token in ("openai", "anthropic", "cohere", "litellm", "google.generativeai"):
             assert token not in text, f"{token!r} found in {fname}"

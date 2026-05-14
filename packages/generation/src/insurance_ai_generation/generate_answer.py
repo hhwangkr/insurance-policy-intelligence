@@ -66,6 +66,12 @@ def main(argv: list[str] | None = None) -> int:
         action="store_true",
         help=("Require [C1]-style markers in answer matching citations_used (strict inline mode)."),
     )
+    parser.add_argument(
+        "--output-path",
+        type=Path,
+        default=None,
+        help="Optional path to write the same JSON as stdout (debug artifact only).",
+    )
     args = parser.parse_args(argv)
 
     configure_stdout_utf8()
@@ -107,6 +113,8 @@ def main(argv: list[str] | None = None) -> int:
             "citation_summary": render_citation_summary(result.answer, bundle),
         }
         out = json.dumps(payload, indent=2, ensure_ascii=False) + "\n"
+        if args.output_path is not None:
+            args.output_path.write_text(out, encoding="utf-8", newline="\n")
     except ValueError as exc:
         print(f"generate_answer: error: {exc}", file=sys.stderr)
         return 1
