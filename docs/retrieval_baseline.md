@@ -254,14 +254,14 @@ This is the intended integration shape (all **in memory**; no required intermedi
 1. User query + metadata filters (`SearchFilters`).
 2. `search_local_index` or `build_citation_context` → **`CitationContextBundle`** in RAM.
 
-LLM answer generation is intentionally out of scope for the current MVP; the retrieval layer produces citation-ready context for future use. Downstream code may call `format_citation_bundle_json` or similar for logging; persisting a bundle to disk is optional (`build_citation_context --output-path`) for debugging or saved examples only.
+The MVP stops at that bundle (FastAPI and `apps/web` expose the same JSON). Optional `build_citation_context --output-path` saves debug/example JSON only; it is not part of the tracked dataset.
 
 ## Known limitations
 
 - **Embedding quality** depends on the chosen model and chunk text (Korean layout quirks, OCR noise).
 - **No reranking** beyond raw cosine similarity.
 - **No cross-reference expansion** across articles.
-- **No generated answers**; downstream LLM use is a separate phase.
+- **No answer synthesis** in this repository; any downstream consumer is out of scope here.
 - **Windows console**: if Korean output garbles, set `PYTHONIOENCODING=utf-8` for the shell session (chunking CLIs also call a best-effort UTF‑8 stdout configure helper).
 
 ## Why retrieval before full RAG

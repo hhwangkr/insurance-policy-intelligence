@@ -1,285 +1,101 @@
 # Insurance Policy Intelligence
 
-Retrieval-first tooling for **public Korean insurance policy PDFs**: ingest disclosure PDFs into structured artifacts, detect sections, chunk with policy-unit awareness, build a **local dense retrieval index**, run **metadata-scoped search**, emit **citation-ready context** bundles, and evaluate retrieval against a curated YAML benchmark.
+**Retrieval-first** tooling for **public Korean insurance policy PDFs**: stage PDFs, **ingest** to structured JSON, **detect sections**, **chunk** with policy metadata, **build a local dense index**, run **metadata-scoped search**, emit **`CitationContextBundle`** (citation-ready evidence), and **evaluate** retrieval from curated YAML. A small **FastAPI** service and **Vite + React** UI expose the same citation context over HTTP.
 
-> Applied systems engineering for insurance document intelligence—not a hosted LLM product.
-
----
-
-## Why This Project Exists
-
-Insurance policy documents are difficult to use in automated pipelines because they contain exclusion clauses, long-context dependencies, nested section hierarchies, ambiguous legal language, product-specific endorsements, and frequent revisions.
-
-Naive chunk-and-embed workflows often fail because chunk boundaries break meaning, exclusions are inconsistently retrieved, and downstream consumers lack stable citation handles.
-
-This repository focuses on:
-
-- section-aware chunking and metadata preservation
-- local semantic retrieval with explicit filters
-- deterministic citation IDs in query-time bundles
-- evaluation against curated queries
-
-LLM answer generation is intentionally out of scope for the current MVP; the retrieval layer produces citation-ready context for future use.
+This is **evidence search infrastructure**, not a hosted LLM product and **not** an answer-generating chatbot in the current tree.
 
 ---
 
-## Architecture (MVP)
+## What this project is
+
+- Ingestion and structuring (PDF → document JSON → sections → chunks).
+- Local semantic retrieval with explicit metadata filters.
+- Deterministic citation handles (`C1`, `C2`, …) in query-time bundles.
+- **HTTP API:** `GET /health`, `POST /retrieval/context` → **`CitationContextBundle` JSON** (same path as `build_citation_context`).
+- **Web UI (`apps/web`):** search form + citation cards + optional raw JSON (no chat, no model calls).
+
+## What it does not do (current MVP)
+
+- No LLM-authored **answer synthesis**, provider registry, or agent orchestration in-repo.
+- No production vector DB service, reranker beyond cosine similarity, or cross-reference graph.
+
+---
+
+## Architecture
 
 ```text
-Insurance PDFs
-      ↓
-Ingestion Pipeline
-      ↓
-Section detection
-      ↓
-Policy-unit / variant-aware chunking
-      ↓
-Local retrieval index (dense embeddings)
-      ↓
-Metadata-scoped search + citation context bundle
-      ↓
-Retrieval evaluation (YAML-driven)
+PDFs (manifest) → ingest → sections → chunks → local index → search / citation bundle → API → web UI
+                                      ↘ retrieval eval (YAML)
 ```
+
+| Area | Location |
+|------|----------|
+| Evidence UI | `apps/web/` |
+| HTTP API | `packages/api/` |
+| Retrieval + eval | `packages/retrieval/` |
+| Ingestion | `packages/ingestion/` |
+| Shared models | `packages/shared/` |
+| Eval package (reserved) | `packages/evaluation/` |
+| Staged PDFs + manifest | `data/inbox/manual/`, `data/raw/manual/`, `data/manifests/` |
+| Generated artifacts | `data/processed/*` (mostly gitignored) |
+| Retrieval benchmark | `data/eval/retrieval_queries.yaml` |
+| Docs | `docs/` |
+| Docker API image | `infra/docker/Dockerfile.api`, `infra/docker-compose.yml` |
 
 ---
 
-## Repository Structure
+## Tech stack
 
-```text
-apps/
-  web/            # Vite + React evidence search UI (Phase 3B)
-
-packages/
-  api/            # FastAPI: health + citation-ready retrieval context
-  ingestion/      # PDF ingestion, sections, chunking
-  retrieval/      # Index, search, citation context, retrieval eval
-  evaluation/     # Evaluation pipelines (reserved)
-  shared/         # Shared models/types
-
-data/
-  inbox/manual/   # tracked original disclosure-room PDFs
-  raw/manual/     # tracked normalized, hash-keyed PDFs
-  processed/      # generated artifacts (mostly gitignored)
-  manifests/      # YAML manifest — lineage
-  eval/           # curated retrieval benchmark YAML
-
-examples/
-  processed_documents/   # curated sample processed JSON
-
-scripts/          # operational helpers (see docs/data-staging.md)
-
-docs/
-  data-staging.md, retrieval_baseline.md, testing_strategy.md, overfitting_audit.md, …
-
-infra/
-  docker/         # API image build
-```
+- **Python 3.12+**, **uv**, **FastAPI**, **Pydantic v2**
+- **sentence-transformers** + **NumPy** local index
+- **Node.js**: **Vite 4**, **React 18**, **TypeScript** (`apps/web`)
+- **Ruff**, **mypy**, **pytest**
 
 ---
 
-## Tech Stack
+## End-to-end commands
 
-### Backend
+From the **repository root** unless noted. Order matters for a cold start.
 
-- Python 3.12+
-- FastAPI (minimal API package)
-- Pydantic v2
+| Step | Command |
+|------|---------|
+| **1. Dependencies** | `uv sync` |
+| **2. Stage PDFs** (if you added inbox files) | `uv run python scripts/stage_manual_inbox.py` (preview) then `… --apply` — see [`docs/data-staging.md`](docs/data-staging.md) |
+| **3. Ingest** | `uv run python -m insurance_ai_ingestion.ingest_manifest --manifest data/manifests/manual.yaml --output-dir data/processed/documents` |
+| **4. Inspect ingestion** | `uv run python -m insurance_ai_ingestion.inspect_documents --input-dir data/processed/documents --report-path data/processed/reports/ingestion_quality.md` |
+| **5. Detect sections** | `uv run python -m insurance_ai_ingestion.detect_sections --input-dir data/processed/documents --output-dir data/processed/sections` |
+| **6. Chunk** | `uv run python -m insurance_ai_ingestion.chunk_sections --input-dir data/processed/sections --output-dir data/processed/chunks` |
+| **7. Inspect chunks** | `uv run python -m insurance_ai_ingestion.inspect_chunks --input-dir data/processed/chunks --report-path data/processed/reports/chunk_quality.md` |
+| **8. Build index** | `uv run python -m insurance_ai_retrieval.build_index --chunks-dir data/processed/chunks --index-dir data/processed/index` |
+| **9. Search** | `uv run python -m insurance_ai_retrieval.search_index --index-dir data/processed/index --insurer kyobolife --product-type annuity --variant-name 적립형 --query "보험금 지급이 늦어지면 이자는 어떻게 계산돼?" --top-k 5 --dedupe-section` |
+| **10. Citation context (CLI)** | `uv run python -m insurance_ai_retrieval.build_citation_context --index-dir data/processed/index --insurer kyobolife --product-type annuity --variant-name 적립형 --query "보험금 지급이 늦어지면 이자는 어떻게 계산돼?" --top-k 5 --dedupe-section` |
+| **11. Retrieval eval** | `uv run python -m insurance_ai_retrieval.evaluate_retrieval --index-dir data/processed/index --queries data/eval/retrieval_queries.yaml --report-path data/processed/reports/retrieval_eval.md` |
+| **12. HTTP API** | `uv run uvicorn insurance_ai_api.main:app --host 127.0.0.1 --port 8765` |
+| **13. Web UI** | `cd apps/web` then `npm ci` and `npm run dev` (see below) |
 
-### Retrieval
-
-- sentence-transformers (default embedding model)
-- NumPy local index (cosine similarity)
-
-### Frontend (evidence UI)
-
-- Node.js + **Vite 4** + **React 18** + TypeScript (`apps/web`)
-
-### Tooling
-
-- uv
-- Ruff
-- mypy
-- pytest
-- Docker
-
----
-
-## Current scope
-
-**In this repository today**
-
-- Public insurance policy PDFs (manual staging and manifests)
-- PDF ingestion to canonical document JSON
-- Section detection
-- Policy unit / variant assignment
-- Section-aware chunking
-- Local dense semantic retrieval over chunks, with **metadata-scoped search** (insurer, product type, optional variant)
-- **Citation context** (`CitationContextBundle`) built at query time via `build_citation_context`
-- **Retrieval evaluation harness** driven by [`data/eval/retrieval_queries.yaml`](data/eval/retrieval_queries.yaml) (see [`docs/testing_strategy.md`](docs/testing_strategy.md) and [`docs/retrieval_baseline.md`](docs/retrieval_baseline.md))
-- **HTTP API** (`packages/api`): `GET /health`, `POST /retrieval/context` — same citation bundle as the CLI; **not** an LLM answer endpoint
-- **Web UI** (`apps/web`): minimal evidence search over the API (no chat, no generation)
-
-**Not yet / out of scope for this MVP**
-
-- LLM answer synthesis, provider registries, or hosted model calls
-- Frontend app workflows beyond any existing scaffolding
-- Cross-reference graph across articles
-- Reranking beyond raw embedding similarity
-- Production vector database service (hosted Qdrant, Pinecone, etc.)
-
----
-
-## Run end-to-end locally
-
-From the repository root, in order:
-
-**A. Install / sync dependencies**
-
-```bash
-uv sync
-```
-
-**B. Stage or verify manual PDFs**
-
-- **Tracked layout:** originals live under `data/inbox/manual/`; ingestion reads **only** normalized paths under `data/raw/manual/` referenced by `data/manifests/manual.yaml` (`source_file`). See [`docs/data-staging.md`](docs/data-staging.md).
-- **After adding new files to** `data/inbox/manual/`, preview inferred rows (no copies, manifest not written):
-
-```bash
-uv run python scripts/stage_manual_inbox.py
-```
-
-- **Apply** staging (copy into `data/raw/manual/` and regenerate `data/manifests/manual.yaml`) when the preview looks correct:
-
-```bash
-uv run python scripts/stage_manual_inbox.py --apply
-```
-
-- **Or** verify an existing clone: confirm each `source_file` in the manifest exists on disk under `data/raw/manual/`.
-
-**C. Ingest documents**
-
-```bash
-uv run python -m insurance_ai_ingestion.ingest_manifest \
-  --manifest data/manifests/manual.yaml \
-  --output-dir data/processed/documents
-```
-
-**D. Inspect ingestion quality**
-
-```bash
-uv run python -m insurance_ai_ingestion.inspect_documents \
-  --input-dir data/processed/documents \
-  --report-path data/processed/reports/ingestion_quality.md
-```
-
-**E. Detect sections**
-
-```bash
-uv run python -m insurance_ai_ingestion.detect_sections \
-  --input-dir data/processed/documents \
-  --output-dir data/processed/sections
-```
-
-**F. Chunk sections**
-
-```bash
-uv run python -m insurance_ai_ingestion.chunk_sections \
-  --input-dir data/processed/sections \
-  --output-dir data/processed/chunks
-```
-
-**G. Inspect chunks**
-
-```bash
-uv run python -m insurance_ai_ingestion.inspect_chunks \
-  --input-dir data/processed/chunks \
-  --report-path data/processed/reports/chunk_quality.md
-```
-
-**H. Build local retrieval index**
-
-```bash
-uv run python -m insurance_ai_retrieval.build_index \
-  --chunks-dir data/processed/chunks \
-  --index-dir data/processed/index
-```
-
-**I. Search (natural-language query with metadata filters)**
-
-Pass `--insurer` and `--product-type` (and optional `--variant-name`) to **scope** hits to one product slice of the index (recommended for evaluation-aligned behavior; omitting these flags searches the entire index).
-
-```bash
-uv run python -m insurance_ai_retrieval.search_index \
-  --index-dir data/processed/index \
-  --insurer kyobolife \
-  --product-type annuity \
-  --variant-name 적립형 \
-  --query "보험금 지급이 늦어지면 이자는 어떻게 계산돼?" \
-  --top-k 5 \
-  --dedupe-section
-```
-
-More scoped smoke examples: [`docs/retrieval_baseline.md`](docs/retrieval_baseline.md).
-
-**J. Build citation context bundle (query-time JSON)**
-
-`build_citation_context` runs the same retrieval as **I** but emits a **structured JSON bundle** (citations `C1`, `C2`, … with full chunk metadata and text) for downstream use. The bundle is **built per request** in memory; in a normal query path you would call the library API and pass the result downstream without treating it as a pipeline artifact.
-
-```bash
-uv run python -m insurance_ai_retrieval.build_citation_context \
-  --index-dir data/processed/index \
-  --insurer kyobolife \
-  --product-type annuity \
-  --variant-name 적립형 \
-  --query "보험금 지급이 늦어지면 이자는 어떻게 계산돼?" \
-  --top-k 5 \
-  --dedupe-section
-```
-
-By default the JSON is printed to **stdout** only. **`--output-path`** is optional and is for **debugging**, **reproducible examples**, or **manual inspection**—saved citation-context JSON files are **not** part of the tracked dataset or the normal ingestion/index outputs. See [`docs/retrieval_baseline.md`](docs/retrieval_baseline.md).
-
-**K. Run retrieval evaluation (after index exists)**
-
-```bash
-uv run python -m insurance_ai_retrieval.evaluate_retrieval \
-  --index-dir data/processed/index \
-  --queries data/eval/retrieval_queries.yaml \
-  --report-path data/processed/reports/retrieval_eval.md
-```
-
-Writes a markdown report under `data/processed/reports/` (generated locally; gitignored). See **Retrieval evaluation** below.
-
-**Generated artifacts (not committed)**
-
-- `data/processed/chunks/*.chunks.json` — regenerated with **F**; gitignored.
-- `data/processed/index/*` — regenerated with **H**; gitignored (directory kept via `.gitkeep`).
-- The first **H** run may download the default embedding model from Hugging Face into the local cache; **no API key** is required for this baseline.
+More flags and behavior: [`docs/retrieval_baseline.md`](docs/retrieval_baseline.md). Staging details: [`docs/data-staging.md`](docs/data-staging.md).
 
 ---
 
 ## Retrieval evaluation
 
-Cases live in [`data/eval/retrieval_queries.yaml`](data/eval/retrieval_queries.yaml) (**16** curated queries across the staged products). The harness checks hit@* against expected section titles and that every hit respects the query’s metadata filters.
-
-**Latest baseline:** hit@1 **13/16**, hit@3 **16/16**, hit@5 **16/16**, **0** failed cases at *k*=5, metadata filter consistency **100%**. For scenario detail, extra CLI smoke tests, and how to interpret reports, see [`docs/retrieval_baseline.md`](docs/retrieval_baseline.md).
+Cases live in [`data/eval/retrieval_queries.yaml`](data/eval/retrieval_queries.yaml). Latest baseline and interpretation: [`docs/retrieval_baseline.md`](docs/retrieval_baseline.md).
 
 ---
 
-## HTTP API (Phase 3A)
+## HTTP API
 
-The **`packages/api`** service exposes citation-ready retrieval context over HTTP (same `build_citation_context` path as the CLI). Responses are **`CitationContextBundle` JSON**—ranked passages with `C1`, `C2`, … handles and metadata—**not** LLM-authored answers.
-
-**CORS:** the API allows browser calls from the Vite dev server on `http://localhost:5173` and `http://127.0.0.1:5173`.
-
-Run from the repository root (the POST handler loads the embedding model and index from disk **per request** for now; ensure step **H** has produced `data/processed/index`):
+- **Returns:** `CitationContextBundle` — ranked evidence chunks with `citation_id`, text, section metadata, scores — **not** model-written answers.
+- **CORS:** browser calls from `http://localhost:5173` and `http://127.0.0.1:5173` are allowed (Vite dev).
 
 ```bash
 uv run uvicorn insurance_ai_api.main:app --reload --host 127.0.0.1 --port 8765
 ```
 
-(You may use any host/port; the web app defaults to `http://127.0.0.1:8765`.)
+**Endpoint:** `POST /retrieval/context`  
+**Health:** `GET /health`
 
-Example request body for `POST /retrieval/context`:
+Example JSON body (matches the web UI default scope):
 
 ```json
 {
@@ -301,15 +117,13 @@ Example request body for `POST /retrieval/context`:
 }
 ```
 
-**Errors:** invalid filters or empty candidate sets typically yield **400** with a `detail` string; a missing index directory or `index_config.json` yields **404**; unexpected failures yield **500**.
+Invalid input → **400**; missing index → **404**; unexpected failure → **500** (`detail` in body when applicable).
 
 ---
 
-## Web UI (Phase 3B)
+## Evidence Search (Web UI)
 
-**`apps/web`** is a minimal **Vite + React + TypeScript** client: **Insurance Policy Evidence Search**. It calls `POST /retrieval/context` and renders citation cards plus a collapsible raw JSON view. It does **not** generate answers, chat, or call any LLM.
-
-Requires **Node.js** (for `npm`). A `package-lock.json` is included for reproducible installs. From the repo root:
+**`apps/web`** — **Insurance Policy Evidence Search**: calls **`POST /retrieval/context`**, shows citation cards and a **collapsed-by-default** raw JSON panel. **Default API** is **`http://127.0.0.1:8765`** (same as the command above). Override with build-time **`VITE_API_BASE_URL`** or the **API base URL** field in the sidebar for other hosts.
 
 ```bash
 cd apps/web
@@ -317,120 +131,76 @@ npm ci
 npm run dev
 ```
 
-Or with a regular install:
+On **Windows PowerShell**, if script execution policy blocks `npm` shims, use:
 
-```bash
+```powershell
 cd apps/web
-npm install
-npm run dev
+npm.cmd ci
+npm.cmd run dev
 ```
 
-Production-style bundle (typecheck + Vite build):
+Production bundle:
 
 ```bash
 cd apps/web
-npm install
+npm ci
 npm run build
 ```
 
-Optional: set `VITE_API_BASE_URL` when running `npm run build` to point the UI at a non-default API origin.
-
-**Local workflow:** start the API (see [HTTP API](#http-api-phase-3a)), then `npm run dev`, open the printed local URL (usually `http://localhost:5173`), run a search against your built index path.
+Start **step 12** (API) in one terminal, **step 13** (UI) in another, then open the URL Vite prints (usually `http://localhost:5173`).
 
 ---
 
-## Testing and evaluation strategy
+## Documentation
 
-- **`pytest`** (under `packages/*/tests/`) should mostly guard **reusable pipeline invariants** (schemas, filters, deterministic citation handles)—not every product-specific section title.
-- **`data/eval/*.yaml`** (e.g. [`data/eval/retrieval_queries.yaml`](data/eval/retrieval_queries.yaml)) holds **curated benchmark cases** for the **current demo corpus**. Extend them when a new document is meant to join that benchmark set.
-- **Adding a new PDF** normally means manifest → ingest → section/chunk/index steps → **run generic tests** → **inspect markdown reports**; it should **not** by default require editing Python tests.
-- **Quality and inspection reports** (`inspect_*` CLIs, `data/processed/reports/*.md`) are the first tools for new documents; **manual review** covers semantic quality until automated judges exist.
-
-See [`docs/testing_strategy.md`](docs/testing_strategy.md) for the full checklist and principles.
+- [`docs/retrieval_baseline.md`](docs/retrieval_baseline.md) — index, search, filters, citation context CLI, retrieval eval.
+- [`docs/testing_strategy.md`](docs/testing_strategy.md) — pytest vs curated YAML vs inspection reports.
+- [`docs/overfitting_audit.md`](docs/overfitting_audit.md) — corpus coupling inventory (includes historical generation-test rows).
+- [`docs/data-staging.md`](docs/data-staging.md) — inbox / raw / manifest workflow.
+- [`docs/section_detection.md`](docs/section_detection.md) — section candidate pipeline.
 
 ---
 
-## Local Development
-
-Install dependencies:
-
-```bash
-uv sync
-```
-
-Run backend (see [HTTP API](#http-api-phase-3a)); optional explicit host/port:
-
-```bash
-uv run uvicorn insurance_ai_api.main:app --reload --host 127.0.0.1 --port 8765
-```
-
-Run evidence UI (see [Web UI](#web-ui-phase-3b)):
-
-```bash
-cd apps/web && npm install && npm run dev
-```
-
-Run tests:
+## Testing
 
 ```bash
 uv run pytest
 ```
 
-See [`docs/testing_strategy.md`](docs/testing_strategy.md) for how **pytest**, **curated eval YAML**, and **inspection reports** relate.
+Strategy (pytest vs YAML vs reports): [`docs/testing_strategy.md`](docs/testing_strategy.md). Corpus coupling notes: [`docs/overfitting_audit.md`](docs/overfitting_audit.md).
 
 ---
 
-## Data artifacts
+## Data artifacts (summary)
 
-This repo keeps a **reproducible paper trail** for public disclosure PDFs:
+| Path | Tracked? | Role |
+|------|----------|------|
+| `data/inbox/manual/`, `data/raw/manual/`, `data/manifests/manual.yaml` | Yes (where applicable) | Staged PDFs + lineage |
+| `data/processed/documents/*.json`, `sections/`, `chunks/`, `index/` | No (regenerate) | Pipeline outputs |
+| `data/processed/reports/*.md`, `*citation_context*.json` | No | Inspection / debug |
+| `data/eval/retrieval_queries.yaml` | Yes | Retrieval benchmark |
+| `examples/processed_documents/` | Yes | Small schema samples |
 
-| Layer | Path | Role |
-|-------|------|------|
-| Original archive | `data/inbox/manual/*.pdf` | **Tracked** downloads using disclosure-room filenames (human-readable provenance). |
-| Normalized staged PDFs | `data/raw/manual/*.pdf` | **Tracked** hash-based keys used as ingestion inputs (`manifest.source_file`). |
-| Lineage + semantics | `data/manifests/manual.yaml` | **Tracked** mapping between `original_filename`, normalized `source_file`, `content_hash`, and labels. |
-| Generated outputs | `data/processed/documents/*.json` | **Not tracked** (large, noisy); regenerate locally. |
-| Chunk JSON (generated) | `data/processed/chunks/*.chunks.json` | **Not tracked**; regenerate with **Run end-to-end locally** (step F). |
-| Local dense index | `data/processed/index/` | **Not tracked** except `.gitkeep`; regenerate with **Run end-to-end locally** (step H). |
-| Retrieval eval queries | `data/eval/retrieval_queries.yaml` | **Tracked** curated benchmark cases for `evaluate_retrieval` (demo corpus; step **K**). |
-| Testing / eval strategy | `docs/testing_strategy.md` | **Tracked** how pytest, YAML benchmarks, and reports fit together. |
-| Overfitting audit | `docs/overfitting_audit.md` | **Tracked** corpus-specific strings in tests vs production vs eval. |
-| Retrieval eval report | `data/processed/reports/retrieval_eval.md` | **Not tracked**; written by step **K**. |
-| Optional citation-context JSON (debug) | `data/processed/reports/*citation_context*.json` | **Not tracked** if you use `--output-path` on **J**; query-time bundles are normally in-memory only. |
-| Portfolio sample | `examples/processed_documents/` | **Tracked** small schema exemplar. |
-
-**Tradeoff:** storing both inbox originals and normalized copies **duplicates bytes** in git for the
-same underlying PDF content. The benefit is **clear provenance** (original filenames and disclosure
-context) plus **deterministic ingestion keys** (`data/raw/manual/...`) decoupled from arbitrary
-download names.
-
-**Ingestion inputs:** the pipeline resolves PDF paths from the manifest only — `source_file` must
-point under **`data/raw/manual/`** (not the inbox). See `docs/data-staging.md`.
-
-Regenerate processed JSON, sections, chunks, index, run search, optionally emit a query-time citation bundle (**J**), and run retrieval evaluation (**K**) using the ordered commands in **Run end-to-end locally** above. Omit `--report-path` on inspect commands for console-only output; markdown reports under `data/processed/reports/` are generated locally and gitignored.
-
-See also `docs/data-staging.md` and `examples/processed_documents/README.md`.
+Regenerate processed artifacts with the **End-to-end commands** table. Ingestion reads manifest paths under **`data/raw/manual/`** only (see `docs/data-staging.md`).
 
 ---
 
-## Design Philosophy
+## Docker
 
-This repository prioritizes:
+```bash
+docker compose -f infra/docker-compose.yml up --build
+```
 
-- maintainability
-- observability
-- evaluation
-- modular layout
-- reproducible retrieval baselines
+API listens on **port 8000** inside the image (`Dockerfile.api`). Map host ports as needed.
 
-over:
+---
 
-- demo-oriented shortcuts
-- prompt-only “RAG” without solid retrieval
-- generic chatbot UX
+## Design philosophy
+
+Prefer maintainability, observability, evaluation, and **reproducible retrieval** over demo-only shortcuts or chat-first UX without solid chunking and citations.
 
 ---
 
 ## Disclaimer
 
-This project uses only publicly available insurance documents and synthetic workflows for applied AI systems engineering exploration.
+This project uses only **public** insurance documents and local tooling for applied systems exploration.

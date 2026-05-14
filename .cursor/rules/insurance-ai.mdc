@@ -22,7 +22,7 @@ alwaysApply: true
 - Prefer explicitness over hidden abstractions.
 - Keep architecture modular and composable; optimize for production readiness.
 - Avoid tightly coupled code.
-- Hallucination reduction and citation grounding are first-class; never treat the LLM as an infallible oracle.
+- Hallucination reduction and citation grounding are first-class for any future reasoning layer; the current tree is **retrieval + citations only** (no in-repo answer model).
 
 ---
 
@@ -42,26 +42,22 @@ alwaysApply: true
 - Keep routers thin; do not put business logic in routers.
 - Use dependency injection explicitly.
 - Separate routers, services, and repositories.
-- Use async endpoints.
+- Prefer async for I/O-heavy handlers; thin synchronous endpoints are acceptable where the stack already uses them.
 
 ---
 
-## AI system
+## AI system (north star; not shipped in current MVP)
 
-- All LLM outputs must use structured outputs; validate before returning.
-- Never expose raw model responses directly to clients.
-- Keep prompts in dedicated prompt files or modules.
-- Separate retrieval, reranking, and reasoning layers.
-- Agent state transitions must be explicit; avoid hidden prompt chains.
+- When an LLM or agent layer is added: structured outputs, validation before return, prompts in dedicated modules, explicit state, no hidden prompt chains.
+- This repository currently ships **dense retrieval + citation bundles** only (`packages/retrieval`, `packages/api`, `apps/web`).
 
 ---
 
-## RAG
+## RAG / retrieval
 
-- Use hybrid retrieval patterns.
-- Preserve metadata and document hierarchy.
-- Support citation-level grounding.
-- Retrieval quality is more important than stylistic generation.
+- Preserve metadata and document hierarchy; support citation-level grounding.
+- Current baseline is **dense retrieval** over local chunks; hybrid / rerank / hosted vector DB patterns are future extensions unless explicitly in scope.
+- Retrieval quality matters more than stylistic generation when a model is involved downstream.
 
 ---
 
@@ -69,7 +65,7 @@ alwaysApply: true
 
 - Use structured logging.
 - Add tracing hooks to major workflows.
-- Log important agent transitions.
+- Log important pipeline or workflow transitions.
 - Avoid silent failures.
 
 ---
@@ -102,4 +98,4 @@ Avoid creating top-level folders named `routers/`, `services/`, `repositories/`,
 ## Frontend
 
 - Keep UI minimal and functional; prioritize clarity over visual complexity.
-- Display citations clearly; surface reasoning traces where useful.
+- Display citations clearly; keep raw bundle access secondary (e.g. collapsed JSON).

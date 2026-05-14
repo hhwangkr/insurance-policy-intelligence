@@ -9,7 +9,7 @@ This note separates **reusable pipeline checks** from **curated benchmark fixtur
 - **Quality / inspection reports** — first-line tools for **newly added** documents (`inspect_*` CLIs, markdown under `data/processed/reports/`, optional saved citation-context JSON). Gitignored artifacts; not the contract for every future policy.
 - **Manual review** — semantic retrieval quality and clause relevance until stronger automated metrics exist.
 
-LLM-based answer generation and its evaluation are **out of scope** for the current MVP; focus tests and YAML on ingestion and retrieval.
+Answer synthesis and its evaluation are **out of scope** for the current MVP; focus tests and YAML on ingestion and retrieval.
 
 ## Unit tests (packages/*/tests)
 
@@ -32,7 +32,7 @@ End-to-end steps (ingest → chunk → index → search) are validated over **wh
 
 ## Curated retrieval evaluation
 
-[`data/eval/retrieval_queries.yaml`](../data/eval/retrieval_queries.yaml) drives `evaluate_retrieval`. It is **intentionally curated and document-specific** for the demo policies. It is **not** a universal contract for every future PDF. Answer-generation benchmarks are not part of this MVP.
+[`data/eval/retrieval_queries.yaml`](../data/eval/retrieval_queries.yaml) drives `evaluate_retrieval`. It is **intentionally curated and document-specific** for the demo policies. It is **not** a universal contract for every future PDF. Benchmark rows cover **retrieval only**.
 
 ## Adding a new policy PDF (checklist)
 

@@ -2,7 +2,7 @@
 
 **Date:** 2026-05-14  
 **Scope (active MVP):** `packages/ingestion/src`, `packages/ingestion/tests`, `packages/retrieval/src`, `packages/retrieval/tests`, `scripts/`, plus pointers to `README.md`, `docs/*.md`, `data/eval/retrieval_queries.yaml`.  
-**Note:** `packages/generation` existed when this audit was written; it was **removed from the workspace** afterward (LLM answer layer intentionally deferred). Rows that referenced generation tests are **historical** and listed only for traceability.
+**Note:** `packages/generation` existed when this audit was written; it was **removed from the workspace** afterward (answer layer intentionally deferred). **Current tree:** that package is still absent; the shipped MVP is **ingestion → retrieval → `packages/api` → `apps/web`**. Rows that referenced generation tests are **historical** and listed only for traceability.
 
 **Search terms:** `kyobolife`, `samsunglife`, `miraeassetlife`, Korean insurer tokens, `제7조` / `제22조` / `별표` / `청약` / `특별계정`, product slugs (`internet_cancer`, `balance_whole_life`, `variable_annuity`, …), effective dates `20260101`, `20260401`, and full demo `document_id` strings.
 
