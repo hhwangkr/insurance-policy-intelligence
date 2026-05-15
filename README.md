@@ -4,6 +4,8 @@
 
 This is **evidence search infrastructure**, not an LLM product: **no** in-repo chatbot, **no** answer synthesis, **no** generation pipeline in the current MVP.
 
+![보험 약관 근거 검색 (웹 UI): 한글 필터, 인용 카드, 원시 JSON. 답변 생성 없음.](docs/assets/evidence-search-ui.png)
+
 ---
 
 ## Architecture
@@ -29,6 +31,8 @@ PDFs → ingest → sections → chunks → index → citation context → API �
 ---
 
 ## Quickstart
+
+The **API** and **web UI** return the same **`CitationContextBundle`**: ranked **source passages** with `citation_id` handles — **not** model-written answers. The UI is for **browsing evidence** and optional inspection JSON only.
 
 `data/processed/*` is **generated locally** (usually **gitignored**). The web UI **does not** build an index. You need **`data/processed/index`** (from `build_index`) before **`/retrieval/options`** and **`/retrieval/context`** work. The first **`build_index`** may download the embedding model from Hugging Face (see [`docs/retrieval_baseline.md`](docs/retrieval_baseline.md)).
 
