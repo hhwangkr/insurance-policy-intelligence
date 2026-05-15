@@ -120,6 +120,25 @@ function scopeSummaryLine(
   return `${pick(iv, options.insurers)} / ${pick(pv, options.product_types)} / ${vLabel}`;
 }
 
+/** UI label only — API `section_type` 값은 변경하지 않습니다. */
+function sectionTypeDisplayLabel(sectionType: string): string {
+  const key = sectionType.trim().toLowerCase();
+  switch (key) {
+    case "appendix":
+      return "별표/부록";
+    case "article":
+      return "조항";
+    case "toc":
+      return "목차";
+    case "guide":
+      return "안내";
+    case "":
+      return "—";
+    default:
+      return sectionType;
+  }
+}
+
 function CitationCard({ c }: { c: CitationEntry }) {
   const [expanded, setExpanded] = useState(false);
   const raw = c.text.trim();
@@ -129,23 +148,44 @@ function CitationCard({ c }: { c: CitationEntry }) {
   const insurerLabel = c.insurer_display_name ?? c.insurer;
   const productLabel = c.product_type_display_name ?? c.product_type;
   const prettyMeta = [insurerLabel, productLabel, c.variant_name].filter(Boolean).join(" · ");
-  const slugMeta = [c.insurer, c.product_type, c.variant_name].filter(Boolean).join(" · ");
-  const showSlugMeta = Boolean(slugMeta && prettyMeta && slugMeta !== prettyMeta);
+
+  const sectionTypeKey = (c.section_type ?? "").trim().toLowerCase();
+  const sectionTypeLabel = sectionTypeDisplayLabel(c.section_type ?? "");
+  const isAppendix = sectionTypeKey === "appendix";
 
   return (
-    <article className="citation-card">
-      <div className="citation-card__id">{c.citation_id}</div>
-      <h3 className="citation-card__title">{c.section_title || "(제목 없음)"}</h3>
-      <div className="citation-card__row">
-        <span className="badge">{c.section_type || "—"}</span>
-        <span className="citation-card__pages">
-          {c.page_start}–{c.page_end}쪽
-        </span>
-        <span className="citation-card__score">유사도 {c.score.toFixed(4)}</span>
-      </div>
+    <article className={`citation-card${isAppendix ? " citation-card--appendix" : ""}`}>
+      <header className="citation-card__header">
+        <div className="citation-card__header-main">
+          <span className="citation-card__cite" title="인용 ID">
+            {c.citation_id}
+          </span>
+          <h3 className="citation-card__title">{c.section_title || "(제목 없음)"}</h3>
+        </div>
+        <div className="citation-card__header-meta" aria-label="구간 유형·페이지·유사도">
+          <span
+            className={`citation-card__type-badge${isAppendix ? " citation-card__type-badge--appendix" : ""}`}
+          >
+            {sectionTypeLabel}
+          </span>
+          <span className="citation-card__header-meta-sep" aria-hidden>
+            ·
+          </span>
+          <span className="citation-card__pages">
+            p.{c.page_start}–{c.page_end}
+          </span>
+          <span className="citation-card__header-meta-sep" aria-hidden>
+            ·
+          </span>
+          <span className="citation-card__score">유사도 {c.score.toFixed(4)}</span>
+        </div>
+      </header>
       <div className="citation-card__meta">{prettyMeta || "—"}</div>
-      {showSlugMeta ? <div className="citation-card__meta-slug">{slugMeta}</div> : null}
-      <p className="citation-card__text">{preview}</p>
+      <p
+        className={`citation-card__text${isLong && !expanded ? " citation-card__text--clamped" : ""}`}
+      >
+        {preview}
+      </p>
       {isLong ? (
         <button type="button" className="link-button" onClick={() => setExpanded((v) => !v)}>
           {expanded ? "접기" : "더 보기"}
@@ -271,6 +311,17 @@ export default function App() {
     () => scopeSummaryLine(insurer, productType, variantName, retrievalOptions),
     [insurer, productType, variantName, retrievalOptions],
   );
+
+  const resultSummarySentence = useMemo(() => {
+    if (!bundle) {
+      return "";
+    }
+    const phrase = scopeSummary.replace(/\s*\/\s*/g, " · ");
+    if (bundle.citations.length === 0) {
+      return `${phrase} 검색 범위에서 일치하는 근거를 찾지 못했습니다.`;
+    }
+    return `${phrase}에서 근거 ${bundle.citations.length}건을 찾았습니다.`;
+  }, [bundle, scopeSummary]);
 
   const runSearch = useCallback(async () => {
     setError(null);
@@ -536,19 +587,30 @@ export default function App() {
               </div>
             ) : null}
 
+            {!bundle && !loading && !error ? (
+              <div className="results-intro" role="status">
+                <h2 className="results-intro__title">검색 결과가 여기에 표시됩니다</h2>
+                <p className="results-intro__body">
+                  질문을 입력하고 근거 검색을 누르면 관련 조항과 별표를 C1, C2 형태의 근거 카드로 보여줍니다.
+                </p>
+                <ul className="results-intro__hints">
+                  <li>조항명과 별표 제목</li>
+                  <li>페이지 범위</li>
+                  <li>원문 미리보기</li>
+                  <li>검색 점수</li>
+                  <li>원본 CitationContextBundle JSON</li>
+                </ul>
+              </div>
+            ) : null}
+
             {bundle && !loading ? (
               <>
-                <p className="result-summary">
-                  근거 {bundle.citations.length}건 · {scopeSummary} · 상위 {bundle.top_k}건
-                </p>
+                <p className="result-summary">{resultSummarySentence}</p>
 
                 {bundle.citations.length === 0 ? (
-                  <div className="state state--empty">
-                    <div className="state__title">근거가 없습니다</div>
-                    <div className="state__body">
-                      이 질문과 검색 범위에서 인덱스가 반환한 근거가 없습니다. 검색 범위를 넓히거나 질문을 바꿔
-                      다시 시도해 보세요.
-                    </div>
+                  <div className="state state--no-results" role="status">
+                    <div className="state__title">검색 결과가 없습니다</div>
+                    <div className="state__body">검색 범위나 질문을 조정해보세요.</div>
                   </div>
                 ) : (
                   <div className="citation-list">
