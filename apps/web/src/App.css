@@ -62,8 +62,7 @@ body {
 .sidebar__heading {
   font-size: 0.72rem;
   font-weight: 700;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
+  letter-spacing: 0.02em;
   color: #5c6578;
   margin: 0 0 0.55rem;
 }
@@ -227,21 +226,10 @@ body {
 
 .example-chips__title {
   margin: 0 0 0.35rem;
-  font-size: 0.68rem;
+  font-size: 0.72rem;
   font-weight: 600;
-  color: #8b95a8;
-  letter-spacing: 0.02em;
-}
-
-.example-chips__title-en {
-  text-transform: uppercase;
-}
-
-.example-chips__title-ko {
-  font-weight: 500;
-  text-transform: none;
-  letter-spacing: 0;
-  color: #7a8499;
+  color: #5c6578;
+  letter-spacing: 0.01em;
 }
 
 .example-chips__list {

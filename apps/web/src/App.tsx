@@ -51,9 +51,9 @@ function normalizeApiBase(raw: string): string {
 const PREVIEW_CHARS = 280;
 
 const API_REACH_HELP =
-  "Could not reach the retrieval API at {url}. Make sure the API is running:\n\nuv run uvicorn insurance_ai_api.main:app --host 127.0.0.1 --port 8765";
+  "검색 API에 연결할 수 없습니다 ({url}).\n\n아래 명령으로 API가 실행 중인지 확인하세요:\n\nuv run uvicorn insurance_ai_api.main:app --host 127.0.0.1 --port 8765";
 
-/** Static prompts only — copy into the query field; no chat or auto-search. */
+/** 화면 예시용 정적 질문(검색창에만 채움). 채팅·자동 검색 없음. */
 const EXAMPLE_EVIDENCE_QUERIES: readonly string[] = [
   "보험금 지급이 늦어지면 이자는 어떻게 계산돼?",
   "청약 철회는 언제까지 가능해?",
@@ -107,16 +107,16 @@ function scopeSummaryLine(
   const vv = variantName.trim();
   const pick = (v: string, list: FilterOption[]) => {
     if (!v) {
-      return "—";
+      return "전체";
     }
     const hit = list.find((o) => o.value === v);
     return hit?.label ?? v;
   };
   if (!options) {
-    return `${iv || "—"} / ${pv || "—"} / ${vv || "—"}`;
+    return `${iv || "전체"} / ${pv || "전체"} / ${vv || "전체"}`;
   }
   const vLabel =
-    (vv && options.variant_names.find((o) => o.value === vv)?.label) || vv || "—";
+    (vv && options.variant_names.find((o) => o.value === vv)?.label) || vv || "전체";
   return `${pick(iv, options.insurers)} / ${pick(pv, options.product_types)} / ${vLabel}`;
 }
 
@@ -135,20 +135,20 @@ function CitationCard({ c }: { c: CitationEntry }) {
   return (
     <article className="citation-card">
       <div className="citation-card__id">{c.citation_id}</div>
-      <h3 className="citation-card__title">{c.section_title || "—"}</h3>
+      <h3 className="citation-card__title">{c.section_title || "(제목 없음)"}</h3>
       <div className="citation-card__row">
         <span className="badge">{c.section_type || "—"}</span>
         <span className="citation-card__pages">
-          p.{c.page_start}–{c.page_end}
+          {c.page_start}–{c.page_end}쪽
         </span>
-        <span className="citation-card__score">score {c.score.toFixed(4)}</span>
+        <span className="citation-card__score">유사도 {c.score.toFixed(4)}</span>
       </div>
       <div className="citation-card__meta">{prettyMeta || "—"}</div>
       {showSlugMeta ? <div className="citation-card__meta-slug">{slugMeta}</div> : null}
       <p className="citation-card__text">{preview}</p>
       {isLong ? (
         <button type="button" className="link-button" onClick={() => setExpanded((v) => !v)}>
-          {expanded ? "Show less" : "Show more"}
+          {expanded ? "접기" : "더 보기"}
         </button>
       ) : null}
     </article>
@@ -305,7 +305,7 @@ export default function App() {
       try {
         data = JSON.parse(text) as unknown;
       } catch {
-        setError(`Invalid JSON (${res.status}): ${text.slice(0, 200)}`);
+        setError(`JSON 형식이 아닙니다 (HTTP ${res.status}): ${text.slice(0, 200)}`);
         return;
       }
       if (!res.ok) {
@@ -313,7 +313,7 @@ export default function App() {
           typeof data === "object" && data !== null && "detail" in data
             ? String((data as { detail: unknown }).detail)
             : text;
-        setError(`HTTP ${res.status}: ${detail}`);
+        setError(`요청 실패 (HTTP ${res.status}): ${detail}`);
         return;
       }
       setBundle(data as CitationBundle);
@@ -340,11 +340,11 @@ export default function App() {
   return (
     <div className="app-shell">
       <div className="app-inner">
-        <aside className="sidebar" aria-label="Search scope and filters">
+        <aside className="sidebar" aria-label="검색 범위 및 인덱스">
           <div className="sidebar__block">
-            <h2 className="sidebar__heading">Index</h2>
+            <h2 className="sidebar__heading">인덱스</h2>
             <label className="field">
-              <span className="field__label">index_dir (server)</span>
+              <span className="field__label">인덱스 경로</span>
               <input
                 type="text"
                 value={indexDir}
@@ -352,28 +352,28 @@ export default function App() {
                 spellCheck={false}
               />
             </label>
-            <p className="sidebar__hint">Path as seen by the API process (repo root when running uvicorn locally).</p>
+            <p className="sidebar__hint">API 서버가 사용할 로컬 검색 인덱스 경로입니다.</p>
           </div>
 
           <div className="sidebar__block">
-            <h2 className="sidebar__heading">Filters</h2>
+            <h2 className="sidebar__heading">검색 범위</h2>
             {optionsLoad === "loading" ? (
-              <p className="sidebar__hint sidebar__hint--loading">Loading filter values from index…</p>
+              <p className="sidebar__hint sidebar__hint--loading">인덱스에서 필터 목록을 불러오는 중…</p>
             ) : null}
             {optionsLoad === "error" ? (
               <p className="sidebar__warning" role="status">
-                Could not load filter options from the index. Enter values manually.
+                인덱스에서 필터 옵션을 불러오지 못했습니다. 값을 직접 입력해 주세요.
               </p>
             ) : null}
             <label className="field">
-              <span className="field__label">insurer</span>
+              <span className="field__label">보험사</span>
               {useFilterSelects ? (
                 <select
                   className="field-select"
                   value={insurer}
                   onChange={(e) => setInsurer(e.target.value)}
                 >
-                  <option value="">Any</option>
+                  <option value="">전체</option>
                   {insurerChoices.map((o) => (
                     <option key={o.value} value={o.value}>
                       {o.label}
@@ -385,14 +385,14 @@ export default function App() {
               )}
             </label>
             <label className="field">
-              <span className="field__label">product_type</span>
+              <span className="field__label">상품 유형</span>
               {useFilterSelects ? (
                 <select
                   className="field-select"
                   value={productType}
                   onChange={(e) => setProductType(e.target.value)}
                 >
-                  <option value="">Any</option>
+                  <option value="">전체</option>
                   {productTypeChoices.map((o) => (
                     <option key={o.value} value={o.value}>
                       {o.label}
@@ -408,14 +408,14 @@ export default function App() {
               )}
             </label>
             <label className="field">
-              <span className="field__label">variant_name</span>
+              <span className="field__label">상품/가입 형태</span>
               {useFilterSelects ? (
                 <select
                   className="field-select"
                   value={variantName}
                   onChange={(e) => setVariantName(e.target.value)}
                 >
-                  <option value="">Any</option>
+                  <option value="">전체</option>
                   {variantChoices.map((o) => (
                     <option key={o.value} value={o.value}>
                       {o.label}
@@ -431,7 +431,7 @@ export default function App() {
               )}
             </label>
             <label className="field">
-              <span className="field__label">top_k</span>
+              <span className="field__label">검색 결과 수</span>
               <input
                 type="number"
                 min={1}
@@ -446,29 +446,23 @@ export default function App() {
                 checked={dedupeSection}
                 onChange={(e) => setDedupeSection(e.target.checked)}
               />
-              <span className="field__label field__label--inline">dedupe_section</span>
+              <span className="field__label field__label--inline">같은 조항 중복 제거</span>
             </label>
           </div>
         </aside>
 
         <main className="main-panel">
           <header className="main-header">
-            <h1 className="main-title">Insurance Policy Evidence Search</h1>
+            <h1 className="main-title">보험 약관 근거 검색</h1>
             <p className="main-subtitle">
-              Evidence console: <code>POST /retrieval/context</code> returns citation-ready passages
-              from your local index. No chatbot and no LLM-authored answers.
+              약관 원문에서 인용 가능한 근거 구절만 찾아줍니다. 답변을 만들거나 요약하지 않으며, 챗봇이나 생성형
+              모델 호출도 없습니다. (API: <code>POST /retrieval/context</code>)
             </p>
           </header>
 
           <div className="query-bar">
-            <div className="example-chips" aria-label="Example evidence searches">
-              <p className="example-chips__title">
-                <span className="example-chips__title-en">Example evidence searches</span>
-                <span className="example-chips__title-ko" lang="ko">
-                  {" "}
-                  예시 근거 검색
-                </span>
-              </p>
+            <div className="example-chips" aria-label="예시 근거 검색">
+              <p className="example-chips__title">예시 근거 검색</p>
               <div className="example-chips__list">
                 {EXAMPLE_EVIDENCE_QUERIES.map((exampleQuery) => (
                   <button
@@ -483,7 +477,7 @@ export default function App() {
               </div>
             </div>
             <label className="field field--grow query-bar__query">
-              <span className="field__label">Query</span>
+              <span className="field__label">질문</span>
               <textarea
                 className="query-textarea"
                 value={query}
@@ -498,16 +492,16 @@ export default function App() {
                 disabled={!canSearch || loading}
                 onClick={runSearch}
               >
-                {loading ? "Searching…" : "Search"}
+                {loading ? "검색 중…" : "근거 검색"}
               </button>
             </div>
           </div>
 
           <details className="advanced-panel">
-            <summary className="advanced-panel__summary">Advanced</summary>
+            <summary className="advanced-panel__summary">API 연결 설정</summary>
             <div className="advanced-panel__body">
               <label className="field">
-                <span className="field__label">API base URL override (optional)</span>
+                <span className="field__label">API 기본 URL 덮어쓰기(선택)</span>
                 <input
                   type="text"
                   value={apiBaseOverride}
@@ -518,8 +512,8 @@ export default function App() {
                 />
               </label>
               <p className="advanced-panel__hint">
-                Leave empty to use <code>VITE_API_BASE_URL</code> from the build (default{" "}
-                <code>http://127.0.0.1:8765</code>). See <code>apps/web/.env.example</code>.
+                비워 두면 빌드 시점의 <code>VITE_API_BASE_URL</code>을 사용합니다(기본값{" "}
+                <code>http://127.0.0.1:8765</code>). 예시는 <code>apps/web/.env.example</code>를 참고하세요.
               </p>
             </div>
           </details>
@@ -527,16 +521,17 @@ export default function App() {
           <div className="main-scroll">
             {error ? (
               <div className="state state--error" role="alert">
-                <div className="state__title">Request failed</div>
+                <div className="state__title">요청에 실패했습니다</div>
                 <div className="state__body state__body--multiline">{error}</div>
               </div>
             ) : null}
 
             {loading ? (
               <div className="state state--loading" aria-live="polite">
-                <div className="state__title">Retrieving evidence…</div>
+                <div className="state__title">근거를 가져오는 중…</div>
                 <div className="state__body">
-                  Waiting for the API. The first call may load the embedding model on the server.
+                  API 응답을 기다리고 있습니다. 첫 요청에서는 서버에서 임베딩 모델을 불러올 수 있어 시간이 걸릴 수
+                  있습니다.
                 </div>
               </div>
             ) : null}
@@ -544,16 +539,15 @@ export default function App() {
             {bundle && !loading ? (
               <>
                 <p className="result-summary">
-                  {bundle.citations.length} citation{bundle.citations.length === 1 ? "" : "s"}{" "}
-                  found · {scopeSummary} · top_k={bundle.top_k}
+                  근거 {bundle.citations.length}건 · {scopeSummary} · 상위 {bundle.top_k}건
                 </p>
 
                 {bundle.citations.length === 0 ? (
                   <div className="state state--empty">
-                    <div className="state__title">No citations</div>
+                    <div className="state__title">근거가 없습니다</div>
                     <div className="state__body">
-                      The index returned an empty list for this query and filter scope. Try
-                      widening filters or changing the query.
+                      이 질문과 검색 범위에서 인덱스가 반환한 근거가 없습니다. 검색 범위를 넓히거나 질문을 바꿔
+                      다시 시도해 보세요.
                     </div>
                   </div>
                 ) : (
@@ -565,7 +559,7 @@ export default function App() {
                 )}
 
                 <details className="raw-json">
-                  <summary className="raw-json__summary">Raw CitationContextBundle JSON</summary>
+                  <summary className="raw-json__summary">원시 JSON (CitationContextBundle)</summary>
                   <pre className="raw-json__pre">{JSON.stringify(bundle, null, 2)}</pre>
                 </details>
               </>

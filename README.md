@@ -12,7 +12,7 @@ This is **evidence search infrastructure**, not a hosted LLM product and **not**
 - Local semantic retrieval with explicit metadata filters.
 - Deterministic citation handles (`C1`, `C2`, …) in query-time bundles.
 - **HTTP API:** `GET /health`, `POST /retrieval/context` → **`CitationContextBundle` JSON** (same path as `build_citation_context`).
-- **Web UI (`apps/web`):** search form + citation cards + optional raw JSON (no chat, no model calls).
+- **Web UI (`apps/web`):** Korean-first 근거 검색 화면(인덱스·검색 범위·질문·근거 검색) + 인용 카드 + 접어 둔 원시 JSON(채팅·모델 호출 없음).
 
 ## What it does not do (current MVP)
 
@@ -126,7 +126,7 @@ Invalid input → **400**; missing index → **404**; unexpected failure → **5
 
 ## Evidence Search (Web UI)
 
-**`apps/web`** — **Insurance Policy Evidence Search**: **`GET /retrieval/options`** fills **insurer / product_type / variant_name** dropdowns using **Korean labels** while requests still send **canonical values**; **`POST /retrieval/context`** returns citations that include both. **Static example question chips** only fill the query field—no chat history or auto-search. **Collapsed-by-default** raw JSON. The UI **defaults to `http://127.0.0.1:8765`** (no API URL in the main sidebar). Set **`VITE_API_BASE_URL`** at dev/build time if needed (copy `apps/web/.env.example` → `apps/web/.env`); a temporary override also lives under **Advanced** in the app.
+**`apps/web`** — **보험 약관 근거 검색**: **`GET /retrieval/options`**가 **보험사·상품 유형·상품/가입 형태** 드롭다운을 채우며, 화면에는 한글 **표시 라벨**을 쓰고 요청 본문에는 여전히 **정규 슬러그**(`insurer`, `product_type`, `variant_name` 등)를 보냅니다. **`POST /retrieval/context`** 응답 인용에는 둘 다 포함됩니다. **정적 예시 질문 칩**은 질문 입력칸만 채웁니다(대화 기록·자동 검색 없음). **기본 접힘** 원시 JSON. UI는 **기본값 `http://127.0.0.1:8765`**를 사용합니다(사이드바 메인에는 API URL 없음). 필요 시 **`VITE_API_BASE_URL`**을 dev/build 시점에 설정(`apps/web/.env.example` → `apps/web/.env`); 앱의 **API 연결 설정**에서 임시로 덮어쓸 수도 있습니다.
 
 ```bash
 cd apps/web
