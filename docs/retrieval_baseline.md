@@ -2,7 +2,7 @@
 
 This document describes the **minimal local semantic retrieval** layer over section-aware chunks. It is **retrieval only**: there is no answer generation, no LLM orchestration, and no cross-reference graph.
 
-For **PDF → JSON → sections → chunks → index → search** from a fresh clone, see the **Run end-to-end locally** section in [`README.md`](../README.md).
+For **PDF → JSON → sections → chunks → index → search** from a fresh clone, see **Quickstart** in [`README.md`](../README.md).
 
 ## What this is not
 
@@ -255,6 +255,34 @@ This is the intended integration shape (all **in memory**; no required intermedi
 2. `search_local_index` or `build_citation_context` → **`CitationContextBundle`** in RAM.
 
 The MVP stops at that bundle (FastAPI and `apps/web` expose the same JSON). Optional `build_citation_context --output-path` saves debug/example JSON only; it is not part of the tracked dataset.
+
+<a id="example-post-retrievalcontext-web-ui"></a>
+
+### Example: POST /retrieval/context (web UI)
+
+Filters use **canonical slugs** (`kyobolife`, `annuity`, …). Display labels (e.g. 교보생명, 연금보험) come from metadata and `GET /retrieval/options`; see [`README.md`](../README.md) Quickstart for running the UI.
+
+```json
+{
+  "query": "보험금 지급이 늦어지면 이자는 어떻게 계산돼?",
+  "index_dir": "data/processed/index",
+  "filters": {
+    "document_id": null,
+    "insurer": "kyobolife",
+    "product_type": "annuity",
+    "product_name": null,
+    "policy_unit_name": null,
+    "variant_name": "적립형",
+    "include_section_types": null,
+    "exclude_section_types": [],
+    "use_default_section_type_excludes": true
+  },
+  "top_k": 5,
+  "dedupe_section": true
+}
+```
+
+Invalid input → **400**; missing index → **404**; unexpected failure → **500** (`detail` in body when applicable).
 
 ## Known limitations
 
